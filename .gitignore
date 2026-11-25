@@ -1,0 +1,13 @@
+build/
+build-*/
+out/
+.cache/
+*.user
+.vscode/
+.idea/
+.DS_Store
+CMakeUserPresets.json
+android/.gradle/
+android/build/
+models/*.onnx
+models/*.gguf

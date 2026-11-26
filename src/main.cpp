@@ -26,7 +26,7 @@
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.10.0-dev"
+#define JOCKER_VERSION "0.11.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion, karaoke)", "nombre");
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion, karaoke, video)", "nombre");
     QCommandLineOption optQueue("queue", "Agregar un archivo a la cola de Automix (se puede repetir)", "archivo");
     QCommandLineOption optAutomix("automix", "Encender el Automix al iniciar");
     cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix});

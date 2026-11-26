@@ -76,9 +76,9 @@ Rectangle {
                            onClicked: root.shownDeck.keyShift = 0 }
                 Item { Layout.fillWidth: true }
                 JxButton { Layout.preferredWidth: 170; Layout.preferredHeight: 26; fontSize: 11; accent: Theme.cyan
-                           text: audience.visible ? "📺  Cerrar pantalla público" : "📺  Pantalla del público"
-                           active: audience.visible
-                           onClicked: audience.visible = !audience.visible }
+                           text: Stage.audienceVisible ? "📺  Cerrar pantalla público" : "📺  Pantalla del público"
+                           active: Stage.audienceVisible
+                           onClicked: Stage.audienceVisible = !Stage.audienceVisible }
             }
         }
 
@@ -213,9 +213,4 @@ Rectangle {
         }
     }
 
-    KaraokeScreen {
-        id: audience
-        visible: false
-        deck: root.shownDeck
-    }
 }

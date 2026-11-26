@@ -2,6 +2,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Analyzer.h"
 
+#ifdef JX_HAVE_VIDEO
+#include <QAudioBuffer>
+#include <QAudioDecoder>
+#include <QEventLoop>
+#include <QTimer>
+#include <QUrl>
+#include "video/DeckVideo.h"
+#endif
+
 #include "KeyDetector.h"
 #include "PlatformDecoder.h"
 #include "library/TagReader.h"
@@ -27,6 +36,69 @@ void guessTitleArtist(const QString& path, QString* title, QString* artist) {
     }
 }
 
+// Respaldo con Qt Multimedia (FFmpeg en Windows/macOS/Android, GStreamer en Linux): AAC en Android,
+// audio de videos (MKV, WebM…) y formatos que el sistema no decodifica.
+bool qtMultimediaDecode(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error) {
+#ifdef JX_HAVE_VIDEO
+    DeckVideo::prepareBackend();
+    QAudioDecoder dec;
+    QAudioFormat fmt;
+    fmt.setSampleRate(int(sampleRate));
+    fmt.setChannelCount(2);
+    fmt.setSampleFormat(QAudioFormat::Float);
+    dec.setAudioFormat(fmt);
+    dec.setSource(QUrl::fromLocalFile(path));
+    QEventLoop loop;
+    bool failed = false;
+    QString msg;
+    QObject::connect(&dec, &QAudioDecoder::bufferReady, &loop, [&]() {
+        while (dec.bufferAvailable()) {
+            const QAudioBuffer b = dec.read();
+            const QAudioFormat f = b.format();
+            const int ch = std::max(1, f.channelCount());
+            const qsizetype frames = b.frameCount();
+            if (f.sampleFormat() == QAudioFormat::Float) {
+                const float* s = b.constData<float>();
+                for (qsizetype i = 0; i < frames; ++i) {
+                    pcm.push_back(s[i * ch]);
+                    pcm.push_back(s[i * ch + (ch > 1 ? 1 : 0)]);
+                }
+            } else if (f.sampleFormat() == QAudioFormat::Int16) {
+                const qint16* s = b.constData<qint16>();
+                for (qsizetype i = 0; i < frames; ++i) {
+                    pcm.push_back(s[i * ch] / 32768.f);
+                    pcm.push_back(s[i * ch + (ch > 1 ? 1 : 0)] / 32768.f);
+                }
+            } else if (f.sampleFormat() == QAudioFormat::Int32) {
+                const qint32* s = b.constData<qint32>();
+                for (qsizetype i = 0; i < frames; ++i) {
+                    pcm.push_back(float(s[i * ch] / 2147483648.0));
+                    pcm.push_back(float(s[i * ch + (ch > 1 ? 1 : 0)] / 2147483648.0));
+                }
+            }
+        }
+    });
+    QObject::connect(&dec, &QAudioDecoder::finished, &loop, &QEventLoop::quit);
+    QObject::connect(&dec, qOverload<QAudioDecoder::Error>(&QAudioDecoder::error), &loop, [&](QAudioDecoder::Error) {
+        failed = true;
+        msg = dec.errorString();
+        loop.quit();
+    });
+    QTimer::singleShot(10 * 60 * 1000, &loop, &QEventLoop::quit);   // nunca colgarse
+    dec.start();
+    loop.exec();
+    dec.stop();
+    if (failed && pcm.empty()) {
+        if (error) *error = msg.isEmpty() ? QStringLiteral("No se pudo decodificar el audio") : msg;
+        return false;
+    }
+    return !pcm.empty();
+#else
+    Q_UNUSED(path); Q_UNUSED(sampleRate); Q_UNUSED(pcm); Q_UNUSED(error);
+    return false;
+#endif
+}
+
 bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error, double maxSeconds) {
     pcm.clear();
     ma_decoder dec;
@@ -39,7 +111,7 @@ bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& 
 #endif
     if (r != MA_SUCCESS) {
         // AAC/M4A, ALAC, WMA…: decodificador del sistema
-        if (platformDecode(path, sampleRate, pcm, error)) {
+        if (platformDecode(path, sampleRate, pcm, error) || qtMultimediaDecode(path, sampleRate, pcm, error)) {
             const size_t maxSamples = static_cast<size_t>(sampleRate * 2 * maxSeconds);
             if (pcm.size() > maxSamples) pcm.resize(maxSamples);
             return true;

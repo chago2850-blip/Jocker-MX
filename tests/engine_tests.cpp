@@ -13,6 +13,7 @@
 #include "app/KaraokeController.h"
 #include "karaoke/Cdg.h"
 #include "karaoke/Lrc.h"
+#include "video/DeckVideo.h"
 #include "app/AutomixPlan.h"
 #include "analysis/Structure.h"
 #include "app/RecordingController.h"
@@ -1132,6 +1133,81 @@ int main(int argc, char** argv) {
         QSettings().remove("karaoke/singers");
         QSettings().remove("karaoke/autoPlay");
         a.pause(); b.pause();
+    }
+
+
+    std::printf("\n[20] Video\n");
+    {
+        CHECK(jx::DeckVideo::isVideoFile("/m/a.MP4") && jx::DeckVideo::isVideoFile("x.mkv") && !jx::DeckVideo::isVideoFile("x.mp3"),
+              "reconoce archivos de video por extensión");
+        if (!jx::DeckVideo::available()) {
+            std::printf("  · compilado sin Qt Multimedia: pruebas de video omitidas\n");
+        } else {
+            const QString vid = tmp.filePath("prueba-video.mp4");
+            QFile::remove(vid);
+            QFile::copy(QStringLiteral(JX_TEST_DATA_DIR) + "/prueba-video.mp4", vid);
+            std::vector<float> vpcm;
+            QString verr;
+            const bool qd = jx::qtMultimediaDecode(vid, sr, vpcm, &verr);
+            const double vsec = vpcm.size() / 2.0 / sr;
+            CHECK(qd && std::abs(vsec - 4.0) < 0.15, "decodificador de respaldo (Qt Multimedia): %.2f s de audio %s", vsec, qPrintable(verr));
+            if (a.playing()) a.pause();
+            a.load(vid);
+            CHECK(waitLoaded(a) && std::abs(a.duration() - 4.0) < 0.15, "el deck carga el audio del video (%.2f s)", a.duration());
+            QElapsedTimer w; w.start();
+            while (!a.hasVideo() && w.elapsed() < 8000) { QCoreApplication::processEvents(QEventLoop::AllEvents, 20); a.tick(); }
+            CHECK(a.hasVideo(), "el deck tiene video");
+            // Color del centro del cuadro mostrado tras dejar que el video se acomode a la posición del deck
+            auto colorAt = [&](double sec) {
+                a.seekSeconds(sec);
+                renderSecs(0.02);
+                QElapsedTimer ww; ww.start();
+                while (ww.elapsed() < 900) { QCoreApplication::processEvents(QEventLoop::AllEvents, 15); a.tick(); }
+                const QImage im = a.video()->image();
+                return im.isNull() ? QColor() : QColor(im.pixel(im.width() / 2, im.height() / 2));
+            };
+            auto dominant = [](const QColor& c) {
+                if (!c.isValid()) return QStringLiteral("nada");
+                if (c.red() > 200 && c.green() > 200 && c.blue() > 200) return QStringLiteral("blanco");
+                if (c.red() > 150 && c.green() < 90 && c.blue() < 90) return QStringLiteral("rojo");
+                if (c.green() > 150 && c.red() < 90 && c.blue() < 90) return QStringLiteral("verde");
+                if (c.blue() > 150 && c.red() < 90 && c.green() < 90) return QStringLiteral("azul");
+                return QStringLiteral("otro");
+            };
+            const QString c25 = dominant(colorAt(2.5)), c05 = dominant(colorAt(0.5)), c35 = dominant(colorAt(3.5));
+            CHECK(c25 == "azul" && c05 == "rojo" && c35 == "blanco",
+                  "en pausa muestra el cuadro de la posición del deck (2,5 s %s · 0,5 s %s · 3,5 s %s)",
+                  qPrintable(c25), qPrintable(c05), qPrintable(c35));
+            // Reproduciendo al ritmo del reloj, con el tempo subido un 8 %
+            a.seekSeconds(0.2);
+            renderSecs(0.02);
+            a.setPitchRange(0.08);
+            a.setPitch(1.0);
+            a.play();
+            double maxDrift = 0;
+            QElapsedTimer pw; pw.start();
+            const double blk = double(block) / sr;
+            double rendered = 0;
+            while (pw.elapsed() < 2200) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+                const qint64 now = pw.elapsed();
+                bool any = false;
+                while (rendered + blk <= now / 1000.0) { renderSecs(blk); rendered += blk; any = true; }   // audio al ritmo del reloj
+                if (any) a.tick();
+                if (now > 900 && a.playing()) maxDrift = std::max(maxDrift, std::abs(a.video()->videoSeconds() - a.position()));
+            }
+            const double endPos = a.position();
+            a.pause();
+            a.setPitch(0.0);
+            CHECK(endPos > 2.3 && maxDrift < 0.2, "con +8 %% de tempo el video sigue al audio (desfase máx. %.0f ms, llegó a %.2f s)",
+                  maxDrift * 1000, endPos);
+            CHECK(jx::DeckVideo::mixWeightB(-1, 0) == 0.0 && jx::DeckVideo::mixWeightB(0, 0) == 0.5 && jx::DeckVideo::mixWeightB(1, 0) == 1.0 &&
+                  jx::DeckVideo::mixWeightB(-0.1, 2) == 0.0 && jx::DeckVideo::mixWeightB(0.1, 2) == 1.0,
+                  "mezcla de video: fundido proporcional y corte en el centro");
+            a.load(tmp.filePath("t124.wav"));
+            waitLoaded(a);
+            CHECK(!a.hasVideo(), "al cargar una pista de audio se quita el video");
+        }
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

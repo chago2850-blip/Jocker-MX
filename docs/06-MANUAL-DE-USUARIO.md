@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.10.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.11.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -140,6 +140,17 @@ En la biblioteca esas canciones llevan 🎤, y en el deck aparece el distintivo 
 - **Rotación**: agrega cantantes arrastrando una canción al panel o desde la biblioteca (clic derecho → **🎤 Agregar a karaoke…**) y escribe su nombre. Cada turno guarda su **tono**; puedes reordenar (▲▼), cambiar el nombre (doble clic) o quitar.
 - **SIGUIENTE CANTANTE** (o `Ctrl+K`): carga su canción en el deck libre **desde el principio** y con su tono, sin cortar al cantante actual. Con **Reproducir al llamar** activado, además mueve el crossfader a ese deck y la arranca.
 - La rotación se guarda al cerrar la app.
+
+## 5 quinquies. Video
+- **Cargar**: los videos (MP4, M4V, MOV, MKV, WebM, AVI…) aparecen en la biblioteca con 🎬 y se cargan como cualquier pista. El deck muestra 🎬 cuando tiene imagen.
+- **Sincronía**: el sonido lo reproduce Jocker-MX (con EQ, efectos, stems, key lock y todo lo demás) y la imagen lo sigue: misma velocidad si cambias el tempo, se detiene en pausa, salta con el cue y los hot cues, y en scratch muestra el cuadro exacto.
+- **Panel 🎬 Video**: arriba a la izquierda, la **mezcla** que verá el público; a la derecha, la imagen de cada deck. La mezcla sigue al **crossfader**:
+  - **Fundido**: una imagen se funde en la otra.
+  - **Barrido**: la imagen del deck B entra de izquierda a derecha.
+  - **Corte**: cambia de golpe al pasar el crossfader por el centro.
+  Si sólo un deck tiene video, se muestra ese aunque el otro esté sonando. **Llenar pantalla** recorta para no dejar bandas negras; **Ajustar** muestra la imagen completa.
+- **📺 Pantalla del público**: es la misma ventana que la del karaoke. Muestra el karaoke cuando hay un cantante o suena una pista con gráficos/letra; si no, la mezcla de video; si no, la pantalla de espera.
+- Los videos de karaoke con la letra «quemada» en la imagen se usan como cualquier video; el tono (panel Karaoke) también funciona con ellos.
 
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:

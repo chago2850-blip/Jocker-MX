@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.10.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.10.0-dev")
+project(JockerMX VERSION 0.11.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.11.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -78,6 +78,19 @@ elseif(NOT ANDROID)
   endif()
 endif()
 
+# Video en los decks y decodificador de respaldo (Qt Multimedia; opcional)
+option(JOCKER_VIDEO "Video en los decks (Qt Multimedia)" ON)
+if(JOCKER_VIDEO)
+  find_package(Qt6 6.4 QUIET COMPONENTS Multimedia)
+endif()
+if(JOCKER_VIDEO AND TARGET Qt6::Multimedia)
+  target_compile_definitions(jxplatformdec INTERFACE JX_HAVE_VIDEO)
+  target_link_libraries(jxplatformdec INTERFACE Qt6::Multimedia)
+  message(STATUS "Video mediante Qt Multimedia ${Qt6Multimedia_VERSION}")
+else()
+  message(WARNING "Qt Multimedia no encontrado: Jocker-MX se compila sin video")
+endif()
+
 # --- Aplicación -------------------------------------------------------------
 qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/main.cpp
@@ -98,7 +111,7 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/stems/StemsService.h src/stems/StemsService.cpp
 )
 
-set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/Theme.qml qml/Stage.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(jocker-mx
   URI JockerMX
@@ -112,6 +125,8 @@ qt_add_qml_module(jocker-mx
     src/ui/CdgItem.h src/ui/CdgItem.cpp
     src/karaoke/Cdg.h src/karaoke/Cdg.cpp
     src/karaoke/Lrc.h src/karaoke/Lrc.cpp
+    src/video/DeckVideo.h src/video/DeckVideo.cpp
+    src/ui/VideoItem.h src/ui/VideoItem.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
@@ -122,6 +137,8 @@ qt_add_qml_module(jocker-mx
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
+    qml/Stage.qml
+    qml/VideoPanel.qml
     qml/Knob.qml
     qml/JxButton.qml
     qml/VuMeter.qml
@@ -267,13 +284,14 @@ set(CPACK_PACKAGE_EXECUTABLES "jocker-mx" "Jocker-MX")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates, qml6-module-qt-labs-folderlistmodel, libqt6sql6-sqlite")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates, qml6-module-qt-labs-folderlistmodel, libqt6sql6-sqlite, libqt6multimedia6")
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "gstreamer1.0-plugins-good, gstreamer1.0-libav")
 # Fedora / openSUSE
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
 set(CPACK_RPM_PACKAGE_AUTOREQ OFF)
-set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.4, qt6-qtdeclarative >= 6.4, (libavcodec-free or ffmpeg-libs), (libavformat-free or ffmpeg-libs), (libswresample-free or ffmpeg-libs)")
+set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.4, qt6-qtdeclarative >= 6.4, qt6-qtmultimedia >= 6.4, (libavcodec-free or ffmpeg-libs), (libavformat-free or ffmpeg-libs), (libswresample-free or ffmpeg-libs)")
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION /usr/share/applications /usr/share/icons /usr/share/icons/hicolor)
 # Windows (NSIS)
 set(CPACK_NSIS_DISPLAY_NAME "Jocker-MX")
@@ -294,6 +312,7 @@ if(JOCKER_BUILD_TESTS)
     src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
     src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/Structure.cpp src/analysis/PlatformDecoder.cpp
     src/karaoke/Cdg.cpp src/karaoke/Lrc.cpp
+    src/video/DeckVideo.h src/video/DeckVideo.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp

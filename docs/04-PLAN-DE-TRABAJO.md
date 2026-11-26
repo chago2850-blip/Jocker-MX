@@ -71,6 +71,7 @@ Las fases se solapan; la columna "Meses" indica la ventana principal.
 
 ### F7 · Video, visuales y karaoke (meses 11-16)
 - Decodificación por hardware, compositor RHI, crossfade y transiciones, 40+ FX de video.
+  - ✅ **0.11.0-dev**: video en los decks sincronizado con el audio (tempo, pausa, cue, scratch), mezcla por crossfader (fundido, barrido, corte) y salida a pantalla del público. Pendiente: aceleración por hardware dedicada, FX de video, capas y visuales.
 - Capas: texto, *song titler*, logo propio, cámara, captura de pantalla, imágenes.
 - Visualizaciones (projectM + shaders propios), videoskins QML, salida a segunda pantalla, Syphon/Spout.
 - Karaoke: CDG/MP3+G, KAR, LRC, video; Karaoke Engine (cola de cantantes, tonos, música de fondo, próximo cantante).

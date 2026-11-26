@@ -21,6 +21,8 @@ struct BeatInfo {
 std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QString* error);
 
 // Sólo decodifica a estéreo float (para muestras del sampler).
+// Decodificación con Qt Multimedia (respaldo; false si no se compiló con video).
+bool qtMultimediaDecode(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error);
 bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error,
                     double maxSeconds = 600.0);
 

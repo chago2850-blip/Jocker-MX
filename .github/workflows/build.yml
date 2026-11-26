@@ -57,7 +57,8 @@ jobs:
             qml6-module-qtquick-dialogs qml6-module-qtquick-window qml6-module-qtqml-workerscript \
             qml6-module-qtquick-templates qml6-module-qt-labs-folderlistmodel \
             libqt6sql6-sqlite libasound2-dev \
-            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev pkg-config
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev pkg-config \
+            qt6-multimedia-dev libqt6multimedia6 gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-libav
       - name: Compilar
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -85,6 +86,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: "6.8.*"
+          modules: qtmultimedia
           cache: true
       - name: NSIS
         run: choco install nsis -y --no-progress
@@ -117,6 +119,7 @@ jobs:
       - uses: jurplel/install-qt-action@v4
         with:
           version: "6.8.*"
+          modules: qtmultimedia
           cache: true
       - name: Compilar
         run: |
@@ -154,6 +157,7 @@ jobs:
           host: all_os
           target: android
           arch: android_arm64_v8a
+          modules: qtmultimedia
           autodesktop: true
           cache: true
       - uses: actions/cache@v4

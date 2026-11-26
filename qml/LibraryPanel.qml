@@ -311,7 +311,7 @@ Rectangle {
                             JxButton { width: 30; height: 22; text: "B"; fontSize: 11; accent: Theme.cyan; active: row.onB; onClicked: deckB.load(model.path) }
                             JxButton { width: 26; height: 22; text: "+"; fontSize: 12; accent: Theme.green; onClicked: automix.add([model.path]); onRightClicked: root.openTrackMenu(model.path, index) }
                         }
-                        Text { Layout.fillWidth: true; Layout.preferredWidth: 30; text: (model.karaoke ? "🎤 " : "") + model.title; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
+                        Text { Layout.fillWidth: true; Layout.preferredWidth: 30; text: (model.karaoke ? "🎤 " : "") + (/\.(mp4|m4v|mov|mkv|webm|avi)$/i.test(model.path) ? "🎬 " : "") + model.title; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
                         Text { Layout.fillWidth: true; Layout.preferredWidth: 22; text: model.artist; color: Theme.dim; font.pixelSize: 13; elide: Text.ElideRight }
                         Text { Layout.fillWidth: true; Layout.preferredWidth: 18; text: model.album; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }
                         Text { Layout.preferredWidth: 84; text: model.genre; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }

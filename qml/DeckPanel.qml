@@ -57,6 +57,12 @@ Rectangle {
                     elide: Text.ElideRight
                 }
             }
+            Rectangle {     // video
+                visible: root.deck.hasVideo
+                width: 26; height: 22; radius: 5
+                color: Qt.rgba(0.25, 0.88, 1, 0.14); border.color: Theme.cyan
+                Text { anchors.centerIn: parent; text: "🎬"; font.pixelSize: 11 }
+            }
             Rectangle {     // karaoke (CD+G / letra) y tono del cantante
                 visible: root.deck.hasCdg || root.deck.hasLyrics || root.deck.keyShift !== 0
                 width: kTxt.implicitWidth + 12; height: 22; radius: 5

@@ -5,6 +5,7 @@
 #include "analysis/Structure.h"
 #include "karaoke/Cdg.h"
 #include "karaoke/Lrc.h"
+#include "video/DeckVideo.h"
 
 #include "engine/AudioEngine.h"
 #include "stems/StemsService.h"
@@ -79,6 +80,7 @@ class DeckController : public QObject {
     Q_PROPERTY(QVariantList sections READ sections NOTIFY sectionsChanged)   // [{start, end, kind, name, bars}]
     Q_PROPERTY(int sectionIndex READ sectionIndex NOTIFY sectionIndexChanged)
     // Karaoke: gráficos CD+G o letra .lrc junto al archivo de audio (mismo nombre)
+    Q_PROPERTY(bool hasVideo READ hasVideo NOTIFY videoChanged)
     Q_PROPERTY(bool hasCdg READ hasCdg NOTIFY karaokeChanged)
     Q_PROPERTY(bool hasLyrics READ hasLyrics NOTIFY karaokeChanged)
     Q_PROPERTY(QStringList lyricsLines READ lyricsLines NOTIFY karaokeChanged)
@@ -178,6 +180,8 @@ public:
     Q_INVOKABLE void seekSeconds(double s);
     Q_INVOKABLE void jumpToSection(int i);   // salta al inicio de la sección (respeta el compás si suena)
     QVariantList sections() const { return m_sectionsVar; }
+    bool hasVideo() const { return m_video.hasVideo(); }
+    DeckVideo* video() { return &m_video; }
     bool hasCdg() const { return m_cdg.isLoaded(); }
     bool hasLyrics() const { return !m_lyrics.isEmpty(); }
     QStringList lyricsLines() const { return m_lyricsLines; }
@@ -232,6 +236,7 @@ signals:
     void stemsProgressChanged();
     void sectionsChanged();
     void karaokeChanged();
+    void videoChanged();
     void lyricChanged();
     void sectionIndexChanged();
     void trackLoaded(const QString& path, double bpm, const QString& key);
@@ -276,6 +281,7 @@ private:
     void updateSections();
     void loadKaraoke(const QString& audioPath);
     void updateLyric(double seconds);
+    DeckVideo m_video;
     CdgPlayer m_cdg;
     Lyrics m_lyrics;
     QStringList m_lyricsLines;

@@ -22,6 +22,7 @@ namespace jx {
 DeckController::DeckController(AudioEngine* engine, int index, QObject* parent)
     : QObject(parent), m_engine(engine), m_index(index), m_deck(engine->deck(index)),
       m_ch(engine->channel(index)), m_fx(engine->effects(index)) {
+    connect(&m_video, &DeckVideo::hasVideoChanged, this, &DeckController::videoChanged);
     for (double& h : m_hot) h = -1;
     setVolume(m_volume);
 }
@@ -133,6 +134,7 @@ void DeckController::load(const QString& pathOrUrl) {
         emit tempoChanged();
         if (m_deck.keyShift.load() != 0) { m_deck.keyShift.store(0); emit keyLockChanged(); }   // cada pista empieza en su tono
         loadKaraoke(m_track->path);
+        m_video.open(m_track->path);
         emit trackLoaded(m_track->path, m_track->bpm, m_track->musicalKey);
         updateSections();
         emit stemsChanged();
@@ -159,6 +161,7 @@ void DeckController::eject() {
     if (old || oldStems) QTimer::singleShot(2000, this, [old, oldStems]() {});
     updateSections();
     loadKaraoke(QString());
+    m_video.close();
     emit stemsChanged();
     emit trackChanged();
 }
@@ -641,6 +644,11 @@ bool DeckController::waitForStems(int ms) {
 
 // ------------------------------------------------------------------ refresco
 void DeckController::tick() {
+    if (m_track && DeckVideo::isVideoFile(m_track->path)) {
+        const bool scratching = m_deck.scratchActive.load();
+        m_video.sync(m_deck.position.load() / m_track->sampleRate, playing() && !scratching,
+                     m_deck.baseRate() * (1.0 + m_deck.nudge.load()));
+    }
     if (m_stemJob && m_stemsState == 1) {
         const double p = m_stemJob->progress.load();
         if (std::abs(p - m_stemsProgress) > 0.005) { m_stemsProgress = p; emit stemsProgressChanged(); }

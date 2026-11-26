@@ -239,6 +239,7 @@ void LibraryModel::rescan() {
         const QString prefix = root + '/';
         const QHash<QString, qint64> known = LibraryDb::knownMtimes(prefix);
         static const QStringList exts = {"*.mp3", "*.wav", "*.flac", "*.wave", "*.ogg", "*.oga", "*.m4a", "*.aac", "*.mp4", "*.aif", "*.aiff",
+                                         "*.m4v", "*.mov", "*.mkv", "*.webm", "*.avi", "*.MP4", "*.MOV", "*.MKV",
                                          "*.MP3", "*.WAV", "*.FLAC", "*.OGG", "*.M4A", "*.AAC", "*.AIF", "*.AIFF"};
         QDirIterator it(root, exts, QDir::Files, QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
         QSet<QString> present;

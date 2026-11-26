@@ -12,3 +12,5 @@ android/build/
 models/*.onnx
 models/*.gguf
 build*/
+models/*.bin
+android/assets/models/

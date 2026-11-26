@@ -3,10 +3,13 @@
 #pragma once
 
 #include <QString>
+#include <atomic>
 #include <cstdint>
 #include <vector>
 
 namespace jx {
+
+struct StemData;   // stems/StemSeparator.h
 
 // Pista decodificada y analizada. Inmutable una vez cargada (se comparte entre hilos).
 struct Track {
@@ -30,6 +33,10 @@ struct Track {
     std::vector<uint8_t> wfLow, wfMid, wfHigh;
 
     double durationSec() const { return frames / sampleRate; }
+
+    // Stems (voz, batería, bajo) calculados en segundo plano; nullptr hasta que estén listos.
+    // El dueño (DeckController) mantiene viva la memoria mientras la pista exista.
+    std::atomic<const StemData*> stems{nullptr};
 };
 
 } // namespace jx

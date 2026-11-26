@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.5.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.5.0-dev")
+project(JockerMX VERSION 0.6.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.6.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -93,6 +93,9 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/analysis/PlatformDecoder.h src/analysis/PlatformDecoder.cpp
   src/library/TagReader.h src/library/TagReader.cpp
   src/library/LibraryDb.h src/library/LibraryDb.cpp
+  src/stems/StemModel.h src/stems/StemModel.cpp
+  src/stems/StemSeparator.h src/stems/StemSeparator.cpp
+  src/stems/StemsService.h src/stems/StemsService.cpp
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -131,6 +134,27 @@ qt_add_qml_module(jocker-mx
 # Rutas de recursos resultantes: qrc:/JockerMX/qml/... y qrc:/JockerMX/resources/...
 
 target_include_directories(jocker-mx PRIVATE src src/app src/ui src/control)
+target_include_directories(jocker-mx SYSTEM PRIVATE third_party/eigen)
+target_compile_definitions(jocker-mx PRIVATE EIGEN_MPL2_ONLY)
+
+# Modelo de stems (Spleeter 4 stems de Deezer, MIT) en el formato de Jocker-MX.
+# Se genera con tools/export_stems_model.py; si no existe, la app funciona sin stems.
+set(JOCKER_STEMS_MODEL "${CMAKE_SOURCE_DIR}/models/jx-stems-4.bin" CACHE FILEPATH "Modelo de stems (jx-stems-4.bin)")
+if(EXISTS "${JOCKER_STEMS_MODEL}")
+  message(STATUS "Modelo de stems: ${JOCKER_STEMS_MODEL}")
+  set(JOCKER_HAVE_STEMS_MODEL ON)
+  if(APPLE)
+    set_source_files_properties("${JOCKER_STEMS_MODEL}" PROPERTIES MACOSX_PACKAGE_LOCATION "Resources/models")
+    target_sources(jocker-mx PRIVATE "${JOCKER_STEMS_MODEL}")
+  elseif(ANDROID)
+    file(COPY "${JOCKER_STEMS_MODEL}" DESTINATION "${CMAKE_SOURCE_DIR}/android/assets/models")
+  else()
+    # Para ejecutar desde la carpeta de compilación
+    file(COPY "${JOCKER_STEMS_MODEL}" DESTINATION "${CMAKE_BINARY_DIR}/models")
+  endif()
+else()
+  message(WARNING "Sin modelo de stems: la separación de voz/instrumentos estará desactivada")
+endif()
 target_compile_definitions(jocker-mx PRIVATE JOCKER_VERSION="${JOCKER_VERSION_STRING}")
 if(MSVC)
   target_compile_definitions(jocker-mx PRIVATE _USE_MATH_DEFINES NOMINMAX)
@@ -196,6 +220,14 @@ if((WIN32 OR APPLE) AND Qt6_VERSION VERSION_GREATER_EQUAL 6.5)
   endif()
 endif()
 
+if(JOCKER_HAVE_STEMS_MODEL AND NOT APPLE AND NOT ANDROID)
+  if(WIN32)
+    install(FILES "${JOCKER_STEMS_MODEL}" DESTINATION ${CMAKE_INSTALL_BINDIR}/models)
+  else()
+    install(FILES "${JOCKER_STEMS_MODEL}" DESTINATION ${CMAKE_INSTALL_DATADIR}/jocker-mx/models)
+  endif()
+endif()
+
 if(UNIX AND NOT APPLE)
   install(FILES packaging/linux/jocker-mx.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
   foreach(size 16 24 32 48 64 128 256 512)
@@ -248,13 +280,15 @@ if(JOCKER_BUILD_TESTS)
     src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
     src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/PlatformDecoder.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
+    src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp
     src/app/Mixer.h src/app/Mixer.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
-  target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
+  target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY)
+  target_include_directories(jx-tests SYSTEM PRIVATE third_party/eigen)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()

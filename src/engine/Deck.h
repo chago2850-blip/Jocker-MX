@@ -33,6 +33,8 @@ public:
     std::atomic<bool>   scratchActive{false};
     std::atomic<double> scratchRate{0.0};    // velocidad de plato durante scratch (puede ser negativa)
 
+    std::atomic<float>  stemGain[4] = {1.f, 1.f, 1.f, 1.f};   // voz, batería, bajo, otros
+
     std::atomic<bool>   loopActive{false};
     std::atomic<double> loopStart{0.0};
     std::atomic<double> loopEnd{0.0};
@@ -65,6 +67,14 @@ private:
     std::unique_ptr<RubberBand::RubberBandStretcher> m_rb;
     std::vector<float> m_inL, m_inR, m_outL, m_outR;
     int m_maxBlock = 4096;
+
+    // Mezcla de stems (hilo de audio)
+    inline float at(const Track* t, int64_t i, int ch) const;
+    inline void stepStemGains();
+    const StemData* m_sd = nullptr;
+    float m_g[4] = {1.f, 1.f, 1.f, 1.f};
+    float m_tg[4] = {1.f, 1.f, 1.f, 1.f};
+    bool m_stemMix = false;
 };
 
 } // namespace jx

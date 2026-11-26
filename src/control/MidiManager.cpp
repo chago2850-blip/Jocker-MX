@@ -43,6 +43,8 @@ const ActionDef kDeckActions[] = {
     {"jumpback", "Saltar 4 beats atrás"}, {"jumpfwd", "Saltar 4 beats adelante"},
     {"fx1", "Efecto: eco"}, {"fx2", "Efecto: reverb"}, {"fx3", "Efecto: flanger"}, {"fx4", "Efecto: phaser"},
     {"fx5", "Efecto: crush"}, {"fx6", "Efecto: gate"}, {"fxwet", "Cantidad del efecto"},
+    {"stem1", "Stem: voz"}, {"stem2", "Stem: batería"}, {"stem3", "Stem: bajo"}, {"stem4", "Stem: melodía"},
+    {"acapella", "Acapella (sólo voz)"}, {"instrumental", "Instrumental (sin voz)"},
 };
 const ActionDef kGlobalActions[] = {
     {"xfader", "Crossfader"}, {"master", "Volumen master"}, {"cuemix", "Mezcla cue / master"},
@@ -274,6 +276,9 @@ void MidiManager::dispatch(const QString& action, int type, int value, int value
     else if (a == "jumpback") d->beatJump(-4);
     else if (a == "jumpfwd") d->beatJump(4);
     else if (a.startsWith("fx") && a.mid(2).toInt() > 0) d->toggleFx(a.mid(2).toInt());
+    else if (a.startsWith("stem")) d->toggleStem(a.mid(4).toInt() - 1);
+    else if (a == "acapella") d->acapella();
+    else if (a == "instrumental") d->instrumental();
 }
 
 void MidiManager::jogTick() {

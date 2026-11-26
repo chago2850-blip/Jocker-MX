@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.5.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.6.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -27,6 +27,19 @@ Las **formas de onda grandes** (arriba) muestran graves en magenta, medios en or
 
 ### Tonalidad y mezcla armónica
 Junto al BPM aparece la **tonalidad** en notación Camelot (por ejemplo **8A** = La menor). Si una pista ya trae la tonalidad en sus etiquetas («Am», «F#m», «1m», «8A»…), se usa esa; si no, Jocker-MX la detecta al analizarla. El recuadro se pone **verde** cuando combina con la pista del otro deck: misma clave, ±1 en la rueda (8A ↔ 7A/9A) o su relativa (8A ↔ 8B). En la biblioteca, la columna TONO se pone en verde para las pistas que combinan con lo que está sonando.
+
+### Stems: voz, batería, bajo y melodía (IA)
+Al cargar una pista, Jocker-MX la **separa en segundo plano** en cuatro partes con inteligencia artificial que corre en tu equipo (sin Internet). En la fila **STEMS** verás «Separando stems con IA… %» y, al terminar, se activan los botones:
+| Botón | Qué hace |
+|---|---|
+| **VOZ / BATERÍA / BAJO / MELODÍA** | Encienden o apagan esa parte de la canción (el cambio es suave, sin chasquidos) |
+| **ACAPELLA** | Deja sólo la voz (otro clic regresa todo) |
+| **INSTRUMENTAL** | Quita la voz (otro clic regresa todo) |
+Ideas: mezcla la voz de una canción sobre el instrumental de otra (mashup), quita la batería para una transición limpia o deja sólo el bajo y la batería para un *breakdown*.
+- Tarda aproximadamente entre 1/8 y 1/4 de la duración de la canción (unos 30-60 s para una de 4 minutos, según tu computadora). Puedes tocar la pista mientras tanto; los botones se activan al terminar.
+- Si cargas la misma pista en el otro deck, se reutiliza la separación.
+- Atajos: `Shift+Q` / `Shift+W` acapella / instrumental del deck A; `Shift+O` / `Shift+P` del deck B.
+- Usa bastante memoria (unos 250 MB por pista de 4 minutos). En equipos con poca memoria puedes desactivar la separación automática (próximamente en Ajustes).
 
 ### Efectos (FX)
 Cada deck tiene una fila **FX** con seis efectos, todos sincronizados al beat de la pista:
@@ -108,4 +121,4 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 10. Próximamente
-Más efectos, stems con IA, interfaz para teléfono, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Más efectos, guardar stems en disco, video y karaoke, interfaz para teléfono, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

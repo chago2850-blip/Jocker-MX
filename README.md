@@ -10,12 +10,12 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.5.0-dev (alfa).** Ahora también lee **AAC/M4A** y hay una primera **APK para Android**. Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-050-dev).
+> **Estado: 0.6.0-dev (alfa).** Nuevo: **separación de stems con IA** (voz, batería, bajo y melodía) en tu propio equipo. Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-060-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-sampler.png" alt="Sampler de Jocker-MX" width="49%"> <img src="assets/screenshots/jocker-mx-midi.png" alt="Controladores MIDI" width="49%"></p>
 
-## Lo que ya funciona en 0.5.0-dev
+## Lo que ya funciona en 0.6.0-dev
 - **2 decks** con carga de **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
@@ -28,12 +28,13 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Biblioteca SQLite**: escaneo incremental de tu carpeta, lectura de etiquetas (ID3 en MP3, Vorbis en FLAC, INFO en WAV), columnas de título, artista, álbum, género, BPM, tonalidad, duración y veces tocada; vistas **Historial**, **Más tocadas** y **Agregadas**.
 - **Búsqueda** sin acentos ni mayúsculas («cancion» encuentra «Canción») y filtros `bpm:120-128` y `key:8A`.
 - **Beatgrid editable**: ½, ×2, TAP, mover la rejilla ±10 ms y «beat aquí»; se guarda por pista junto con cue y hot cues.
+- **Stems con IA**: separa cada pista en **voz, batería, bajo y melodía** en segundo plano al cargarla; botones por stem, **ACAPELLA** e **INSTRUMENTAL**, todo sin cortes y compatible con key lock, scratch, loops y efectos. Usa el modelo libre Spleeter 4 stems (Deezer, MIT) con un **motor de inferencia propio en C++** (sin servicios en la nube ni runtimes externos).
 - **Tonalidad automática** con notación **Camelot** (y Open Key): se muestra en cada deck y en la biblioteca, en **verde** cuando combina armónicamente con lo que está sonando.
 - **Efectos por deck sincronizados al beat**: eco, reverb, flanger, phaser, crush (bitcrusher) y gate, con duración de ¼ a 8 beats y perilla de cantidad.
 - **Sampler de 8 pads** con sonidos incluidos (bocina, sirena, láser, bombo, palmas, subida, impacto, rewind — sintetizados, libres de derechos), modos ONE / LOOP / HOLD, tus propios sonidos (clic derecho o arrastrar) y teclas `Z X C V B N M ,`.
 - **Grabación** de la mezcla (botón **REC** o `Ctrl+R`) en WAV de 24 bits, con **lista de canciones** (.txt) y hoja **.cue** con los tiempos de cada pista.
 - **Analizar todo**: calcula BPM, tonalidad y duración de toda la biblioteca en segundo plano.
-- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 56 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
+- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 62 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
 - Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader.
 
 ### Instalar
@@ -48,6 +49,14 @@ Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-
 | Android 9+ (ARM64) | `.apk` (alfa; pensada para tableta en horizontal) — permite instalar «apps desconocidas» |
 
 ### Compilar desde el código
+El modelo de stems no se guarda en el repositorio (78 MB); genéralo una vez con:
+```bash
+pip install tensorflow-cpu tf_keras numpy
+mkdir -p sp4 models && curl -sSL https://github.com/deezer/spleeter/releases/download/v1.4.0/4stems.tar.gz | tar xz -C sp4
+TF_USE_LEGACY_KERAS=1 python3 tools/export_stems_model.py sp4 models/jx-stems-4.bin /tmp/ref.json
+```
+Sin el modelo, la app funciona igual pero sin stems.
+
 ```bash
 # Requisitos: CMake ≥ 3.21, compilador C++20, Qt 6.4+ (Quick, QuickControls2, Concurrent)
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

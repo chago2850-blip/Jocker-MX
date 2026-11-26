@@ -30,6 +30,8 @@ Jocker-MX se distribuye bajo **GNU General Public License v3.0 o posterior** (`G
 | libKeyFinder | GPL-3.0 | Sí | |
 | Chromaprint | LGPL-2.1 | Sí | |
 | libebur128 | MIT | Sí | |
+| Modelo Spleeter 4 stems (Deezer) | MIT | Sí | Pesos convertidos al formato propio `jx-stems-4.bin` con `tools/export_stems_model.py` |
+| Eigen 3.4 (incluido en `third_party/`) | MPL-2.0 | Sí | Álgebra lineal del motor de inferencia de stems (compilado con `EIGEN_MPL2_ONLY`) |
 | ONNX Runtime | MIT | Sí | Proveedores CUDA/TensorRT usan bibliotecas propietarias de NVIDIA: opcionales, cargadas en tiempo de ejecución, nunca incluidas |
 | llama.cpp / whisper.cpp | MIT | Sí | |
 | Piper TTS | GPL-3.0 | Sí | Verificar licencia de cada voz |

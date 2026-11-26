@@ -3,6 +3,7 @@
 #pragma once
 
 #include "engine/AudioEngine.h"
+#include "stems/StemsService.h"
 
 #include <QObject>
 #include <QElapsedTimer>
@@ -64,6 +65,12 @@ class DeckController : public QObject {
     Q_PROPERTY(double fxWet READ fxWet WRITE setFxWet NOTIFY fxChanged)
     Q_PROPERTY(double fxBeats READ fxBeats WRITE setFxBeats NOTIFY fxChanged)
     Q_PROPERTY(QStringList fxNames READ fxNames CONSTANT)
+    // Stems (IA)
+    Q_PROPERTY(bool stemsAvailable READ stemsAvailable CONSTANT)
+    Q_PROPERTY(int stemsState READ stemsState NOTIFY stemsChanged)          // 0 nada, 1 separando, 2 listos, 3 error
+    Q_PROPERTY(double stemsProgress READ stemsProgress NOTIFY stemsProgressChanged)
+    Q_PROPERTY(QString stemsError READ stemsError NOTIFY stemsChanged)
+    Q_PROPERTY(QVariantList stemOn READ stemOn NOTIFY stemsChanged)
 
 public:
     DeckController(AudioEngine* engine, int index, QObject* parent = nullptr);
@@ -133,6 +140,18 @@ public:
     QStringList fxNames() const;
     Q_INVOKABLE void toggleFx(int t) { setFxType(fxType() == t ? 0 : t); }
 
+    bool stemsAvailable() const { return StemsService::instance().modelAvailable(); }
+    int stemsState() const { return m_stemsState; }
+    double stemsProgress() const { return m_stemsProgress; }
+    QString stemsError() const { return m_stemsError; }
+    QVariantList stemOn() const;
+    Q_INVOKABLE void toggleStem(int i);
+    Q_INVOKABLE void setStem(int i, bool on);
+    Q_INVOKABLE void acapella();          // sólo voz (otra vez: todo)
+    Q_INVOKABLE void instrumental();      // sin voz (otra vez: todo)
+    Q_INVOKABLE void prepareStems();      // separar ahora
+    bool waitForStems(int ms);            // pruebas
+
     Q_INVOKABLE void load(const QString& pathOrUrl);
     Q_INVOKABLE void eject();
     Q_INVOKABLE void playPause();
@@ -177,6 +196,8 @@ signals:
     void mixerChanged();
     void levelChanged();
     void fxChanged();
+    void stemsChanged();
+    void stemsProgressChanged();
     void trackLoaded(const QString& path, double bpm, const QString& key);
     void played(const QString& path);
 
@@ -214,6 +235,14 @@ private:
 
     double m_gain = 0, m_eqHigh = 0, m_eqMid = 0, m_eqLow = 0, m_filter = 0, m_volume = 0.85;
     double m_level = 0;
+
+    void applyStemGains();
+    std::shared_ptr<StemData> m_stems;
+    std::shared_ptr<StemsService::Job> m_stemJob;
+    int m_stemsState = 0;
+    double m_stemsProgress = 0;
+    QString m_stemsError;
+    bool m_stemOn[4] = {true, true, true, true};
 };
 
 } // namespace jx

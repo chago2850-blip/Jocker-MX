@@ -14,6 +14,12 @@
 #include "engine/AudioEngine.h"
 #include "library/LibraryDb.h"
 #include "library/TagReader.h"
+#include "stems/StemModel.h"
+#include "stems/StemsService.h"
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QSettings>
 
 #include <QCoreApplication>
 #include <QDir>
@@ -94,6 +100,7 @@ int main(int argc, char** argv) {
     QTemporaryDir tmp;
     const double sr = 48000.0;
     CHECK(jx::LibraryDb::open(tmp.filePath("biblioteca.sqlite")), "base de datos SQLite creada");
+    QSettings().setValue("stems/auto", false);     // las pruebas de stems se hacen explícitamente
 
     std::printf("\n[1] Análisis de BPM y beatgrid\n");
     struct Case { double bpm, first; };
@@ -501,6 +508,70 @@ int main(int argc, char** argv) {
         std::vector<float> st;
         CHECK(jx::convertToStereo(mono.data(), 4, 1, 48000, 48000, st) && st.size() == 8 && st[0] == st[1],
               "conversión mono → estéreo");
+    }
+
+    std::printf("\n[14] Stems (IA)\n");
+    {
+        const QString modelPath = jx::StemModel::findModelFile();
+        if (modelPath.isEmpty()) {
+            std::printf("  (modelo jx-stems-4.bin no disponible: pruebas de stems omitidas)\n");
+        } else {
+            jx::StemModel m;
+            QString err;
+            CHECK(m.load(modelPath, &err) && m.count() == 4, "modelo cargado: %s", qPrintable(m.names().join(", ")));
+            // Comparación numérica con la salida de TensorFlow (tests/data/stems-referencia.json)
+            const int T = jx::StemModel::kT, F = jx::StemModel::kF;
+            std::vector<float> x(static_cast<size_t>(T) * F * 2);
+            for (int t = 0; t < T; ++t) for (int f = 0; f < F; ++f) for (int c = 0; c < 2; ++c)
+                x[(static_cast<size_t>(t) * F + f) * 2 + c] = static_cast<float>(std::fabs(std::sin(0.37 * t + 0.011 * f * (c + 1))) * (1.5 - f / 1024.0) + 0.05);
+            std::vector<std::vector<float>> out;
+            QElapsedTimer tm; tm.start();
+            m.run(x.data(), out, 2);
+            const double secs = tm.elapsed() / 1000.0;
+            QFile rf(QStringLiteral(JX_TEST_DATA_DIR) + "/stems-referencia.json");
+            rf.open(QIODevice::ReadOnly);
+            const QJsonObject ref = QJsonDocument::fromJson(rf.readAll()).object()["instruments"].toObject();
+            double worst = 0;
+            for (int i = 0; i < m.count(); ++i) {
+                const QJsonObject r = ref[m.names()[i]].toObject();
+                double mean = 0; for (float v : out[i]) mean += v; mean /= out[i].size();
+                worst = std::max(worst, std::abs(mean - r["mean"].toDouble()) / (r["mean"].toDouble() + 1e-9));
+                for (const auto& sv : r["samples"].toArray()) {
+                    const QJsonArray a = sv.toArray();
+                    const double got = out[i][(static_cast<size_t>(a[0].toInt()) * F + a[1].toInt()) * 2 + a[2].toInt()];
+                    worst = std::max(worst, std::abs(got - a[3].toDouble()) / (std::abs(a[3].toDouble()) + 0.02));
+                }
+            }
+            CHECK(worst < 0.03, "red U-Net igual a TensorFlow (desviación máx. %.4f; %.2f s por bloque de 11.9 s)", worst, secs);
+
+            // Separación completa en un deck
+            if (a.playing()) a.playPause();
+            a.load(tmp.filePath("t124.wav"));
+            CHECK(waitLoaded(a), "pista cargada para stems");
+            a.prepareStems();
+            CHECK(a.waitForStems(240000) && a.stemsState() == 2, "stems listos (%s)", qPrintable(a.stemsError()));
+            a.setVolume(1); a.setGain(0); a.setFxType(0); eng.crossfader.store(0.f);
+            a.seekFraction(0.3);
+            a.playPause();
+            renderSecs(0.3);
+            std::vector<float> full; renderSecs(2.0, &full);
+            a.setStem(1, false);                         // sin batería
+            renderSecs(0.2);
+            std::vector<float> noDrums; renderSecs(2.0, &noDrums);
+            a.setStem(1, true);
+            a.acapella();                                // sólo voz
+            renderSecs(0.2);
+            std::vector<float> voc; renderSecs(2.0, &voc);
+            a.acapella();                                // de nuevo todo
+            renderSecs(0.2);
+            std::vector<float> back; renderSecs(2.0, &back);
+            bool finite = true; for (float v : noDrums) finite &= std::isfinite(v);
+            CHECK(finite && rms(noDrums) < rms(full) * 0.5,
+                  "quitar la batería (la pista de prueba es casi pura batería): RMS %.3f → %.3f", rms(full), rms(noDrums));
+            CHECK(rms(voc) < rms(full) * 0.3, "acapella de una pista sin voz casi en silencio (RMS %.3f)", rms(voc));
+            CHECK(std::abs(rms(back) - rms(full)) < rms(full) * 0.15, "con todos los stems vuelve el sonido original (RMS %.3f)", rms(back));
+            a.playPause();
+        }
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

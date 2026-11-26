@@ -13,11 +13,42 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    name: Linux (.deb y .rpm)
+  # Modelo de stems: se genera a partir del modelo público Spleeter 4 stems (Deezer, MIT) y se guarda en caché
+  modelo:
+    name: Modelo de stems (IA)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - id: cache
+        uses: actions/cache@v4
+        with:
+          path: models/jx-stems-4.bin
+          key: stems-${{ hashFiles('tools/export_stems_model.py') }}
+      - if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Exportar modelo
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          pip install -q tensorflow-cpu tf_keras numpy
+          mkdir -p sp4 models
+          curl -sSL https://github.com/deezer/spleeter/releases/download/v1.4.0/4stems.tar.gz | tar xz -C sp4
+          TF_USE_LEGACY_KERAS=1 python tools/export_stems_model.py sp4 models/jx-stems-4.bin /tmp/referencia.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stems-model
+          path: models/jx-stems-4.bin
+          retention-days: 3
+
+  linux:
+    name: Linux (.deb y .rpm)
+    needs: modelo
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: stems-model, path: models }
       - name: Dependencias
         run: |
           sudo apt-get update
@@ -32,6 +63,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           cmake --build build
       - name: Pruebas
+        env: { JX_STEMS_MODEL: "${{ github.workspace }}/models/jx-stems-4.bin" }
         run: ./build/jx-tests
       - name: Paquetes
         run: cd build && cpack -G "DEB;RPM"
@@ -44,9 +76,12 @@ jobs:
 
   windows:
     name: Windows (instalador)
+    needs: modelo
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: stems-model, path: models }
       - uses: jurplel/install-qt-action@v4
         with:
           version: "6.8.*"
@@ -58,6 +93,7 @@ jobs:
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64
           cmake --build build --config Release
       - name: Pruebas
+        env: { JX_STEMS_MODEL: "${{ github.workspace }}/models/jx-stems-4.bin" }
         run: .\build\Release\jx-tests.exe
       - name: Paquetes
         run: |
@@ -72,9 +108,12 @@ jobs:
 
   macos:
     name: macOS (.dmg universal)
+    needs: modelo
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: stems-model, path: models }
       - uses: jurplel/install-qt-action@v4
         with:
           version: "6.8.*"
@@ -84,6 +123,7 @@ jobs:
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           cmake --build build
       - name: Pruebas
+        env: { JX_STEMS_MODEL: "${{ github.workspace }}/models/jx-stems-4.bin" }
         run: ./build/jx-tests
       - name: Paquete
         run: |
@@ -98,9 +138,12 @@ jobs:
 
   android:
     name: Android (APK)
+    needs: modelo
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: stems-model, path: models }
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -171,6 +214,7 @@ jobs:
           fi
       - uses: actions/download-artifact@v4
         with:
+          pattern: jocker-mx-*
           path: dist
           merge-multiple: true
       - name: Lista de archivos
@@ -186,6 +230,10 @@ jobs:
           body: |
             ## Jocker-MX ${{ steps.ver.outputs.tag }} (alfa)
             Software DJ libre (GPL-3.0-or-later). Versión de prueba: puede tener errores.
+
+            **Novedad: separación de stems con IA** (voz, batería, bajo y melodía) ejecutada en tu equipo, con el modelo
+            Spleeter de Deezer (MIT) y un motor de inferencia propio. Además: AAC/M4A, sampler, grabación, efectos,
+            tonalidad Camelot, biblioteca y controladores MIDI.
 
             | Sistema | Archivo | Cómo instalar |
             |---|---|---|

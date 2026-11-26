@@ -7,6 +7,9 @@
 #include "library/LibraryDb.h"
 
 #include <QFutureWatcher>
+#include <QSettings>
+#include <QElapsedTimer>
+#include <QCoreApplication>
 #include <QTimer>
 #include <QUrl>
 #include <QtConcurrent/QtConcurrentRun>
@@ -87,11 +90,18 @@ void DeckController::load(const QString& pathOrUrl) {
             emit errorChanged();
             return;
         }
-        // Mantener viva la pista anterior un momento: el hilo de audio podría estar leyéndola.
+        // Mantener viva la pista anterior (y sus stems) un momento: el hilo de audio podría estar leyéndola.
         std::shared_ptr<Track> old = m_track;
+        std::shared_ptr<StemData> oldStems = m_stems;
+        if (m_stemJob) m_stemJob->cancel = true;
+        m_stemJob.reset();
+        m_stems.reset();
+        m_stemsState = 0;
+        m_stemsProgress = 0;
+        m_stemsError.clear();
         m_track = t;
         m_deck.setTrack(m_track.get());
-        if (old) QTimer::singleShot(2000, this, [old]() {});
+        if (old || oldStems) QTimer::singleShot(2000, this, [old, oldStems]() {});
 
         // Restaurar estado guardado en la biblioteca (beatgrid editado, cues, hot cues)
         // (la biblioteca guarda posiciones en segundos; el motor trabaja en cuadros)
@@ -120,6 +130,8 @@ void DeckController::load(const QString& pathOrUrl) {
         emit loopChanged();
         emit tempoChanged();
         emit trackLoaded(m_track->path, m_track->bpm, m_track->musicalKey);
+        emit stemsChanged();
+        if (stemsAvailable() && QSettings().value("stems/auto", true).toBool()) prepareStems();
     });
     watcher->setFuture(QtConcurrent::run([path, sr, errPtr]() -> std::shared_ptr<Track> {
         QString err;
@@ -132,9 +144,15 @@ void DeckController::load(const QString& pathOrUrl) {
 void DeckController::eject() {
     if (playing()) return;
     std::shared_ptr<Track> old = m_track;
+    std::shared_ptr<StemData> oldStems = m_stems;
+    if (m_stemJob) m_stemJob->cancel = true;
+    m_stemJob.reset();
+    m_stems.reset();
+    m_stemsState = 0;
     m_deck.setTrack(nullptr);
     m_track.reset();
-    if (old) QTimer::singleShot(2000, this, [old]() {});
+    if (old || oldStems) QTimer::singleShot(2000, this, [old, oldStems]() {});
+    emit stemsChanged();
     emit trackChanged();
 }
 
@@ -451,8 +469,82 @@ QStringList DeckController::fxNames() const {
     return l;
 }
 
+// ------------------------------------------------------------------ stems
+QVariantList DeckController::stemOn() const {
+    return {m_stemOn[0], m_stemOn[1], m_stemOn[2], m_stemOn[3]};
+}
+
+void DeckController::applyStemGains() {
+    for (int i = 0; i < 4; ++i) m_deck.stemGain[i].store(m_stemOn[i] ? 1.f : 0.f);
+    emit stemsChanged();
+}
+
+void DeckController::setStem(int i, bool on) {
+    if (i < 0 || i > 3) return;
+    m_stemOn[i] = on;
+    applyStemGains();
+    if (m_stemsState == 0 && m_track) prepareStems();
+}
+
+void DeckController::toggleStem(int i) { if (i >= 0 && i < 4) setStem(i, !m_stemOn[i]); }
+
+void DeckController::acapella() {
+    const bool only = m_stemOn[0] && !m_stemOn[1] && !m_stemOn[2] && !m_stemOn[3];
+    for (int i = 0; i < 4; ++i) m_stemOn[i] = only ? true : (i == 0);
+    applyStemGains();
+    if (m_stemsState == 0 && m_track) prepareStems();
+}
+
+void DeckController::instrumental() {
+    const bool inst = !m_stemOn[0] && m_stemOn[1] && m_stemOn[2] && m_stemOn[3];
+    for (int i = 0; i < 4; ++i) m_stemOn[i] = inst ? true : (i != 0);
+    applyStemGains();
+    if (m_stemsState == 0 && m_track) prepareStems();
+}
+
+void DeckController::prepareStems() {
+    if (!m_track || m_stemsState == 1 || m_stemsState == 2) return;
+    if (!stemsAvailable()) {
+        m_stemsState = 3;
+        m_stemsError = QStringLiteral("Modelo de stems no instalado");
+        emit stemsChanged();
+        return;
+    }
+    m_stemsState = 1;
+    m_stemsProgress = 0;
+    m_stemsError.clear();
+    emit stemsChanged();
+    std::shared_ptr<Track> track = m_track;
+    m_stemJob = StemsService::instance().separate(track, this, [this, track](std::shared_ptr<StemData> sd, QString err) {
+        if (track != m_track) return;                 // la pista cambió mientras se separaba
+        m_stemJob.reset();
+        if (!sd) {
+            m_stemsState = 3;
+            m_stemsError = err.isEmpty() ? QStringLiteral("No se pudieron separar los stems") : err;
+        } else {
+            m_stems = sd;
+            m_track->stems.store(m_stems.get(), std::memory_order_release);
+            m_stemsState = 2;
+            m_stemsProgress = 1;
+        }
+        emit stemsChanged();
+        emit stemsProgressChanged();
+    });
+}
+
+bool DeckController::waitForStems(int ms) {
+    QElapsedTimer t;
+    t.start();
+    while (m_stemsState == 1 && t.elapsed() < ms) QCoreApplication::processEvents(QEventLoop::AllEvents, 50);
+    return m_stemsState == 2;
+}
+
 // ------------------------------------------------------------------ refresco
 void DeckController::tick() {
+    if (m_stemJob && m_stemsState == 1) {
+        const double p = m_stemJob->progress.load();
+        if (std::abs(p - m_stemsProgress) > 0.005) { m_stemsProgress = p; emit stemsProgressChanged(); }
+    }
     const double pos = m_deck.position.load();
     if (pos != m_lastPos) { m_lastPos = pos; emit positionChanged(); }
     const bool pl = m_deck.playing.load();

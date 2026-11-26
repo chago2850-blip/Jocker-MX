@@ -1,0 +1,1 @@
+Eigen 3.4.0 (Ubuntu 24.04 libeigen3-dev). Licencia MPL-2.0.

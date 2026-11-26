@@ -240,6 +240,62 @@ Rectangle {
             JxButton { Layout.preferredWidth: 30; Layout.preferredHeight: 28; text: "▶"; bold: false; onClicked: root.deck.beatJump(4) }
         }
 
+        // ---------- Stems (IA): voz, batería, bajo, melodía
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Text { text: "STEMS"; color: Theme.faint; font.pixelSize: 9; font.weight: Font.Bold; font.letterSpacing: 1; Layout.preferredWidth: 46 }
+            Item {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 28
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: 6
+                    opacity: root.deck.stemsState === 2 ? 1.0 : 0.55
+                    Repeater {
+                        model: [ { t: "VOZ", c: Theme.magenta }, { t: "BATERÍA", c: Theme.orange }, { t: "BAJO", c: Theme.cyan }, { t: "MELODÍA", c: Theme.gold } ]
+                        JxButton {
+                            Layout.fillWidth: true; Layout.preferredHeight: 28
+                            text: modelData.t; fontSize: 10
+                            accent: modelData.c
+                            active: root.deck.stemOn[index] === true
+                            onClicked: root.deck.toggleStem(index)
+                        }
+                    }
+                    JxButton { Layout.preferredWidth: 72; Layout.preferredHeight: 28; text: "ACAPELLA"; fontSize: 9; accent: Theme.magenta
+                               active: root.deck.stemOn[0] === true && root.deck.stemOn[1] === false && root.deck.stemOn[2] === false && root.deck.stemOn[3] === false
+                               onClicked: root.deck.acapella() }
+                    JxButton { Layout.preferredWidth: 82; Layout.preferredHeight: 28; text: "INSTRUMENTAL"; fontSize: 9; accent: Theme.gold
+                               active: root.deck.stemOn[0] === false && root.deck.stemOn[1] === true && root.deck.stemOn[2] === true && root.deck.stemOn[3] === true
+                               onClicked: root.deck.instrumental() }
+                }
+                // Estado de la separación
+                Rectangle {
+                    visible: root.deck.loaded && root.deck.stemsState !== 2
+                    anchors.fill: parent
+                    radius: 6
+                    color: Qt.rgba(0.04, 0.03, 0.07, 0.82)
+                    border.color: root.deck.stemsState === 3 ? Theme.red : Theme.border
+                    Rectangle {
+                        visible: root.deck.stemsState === 1
+                        anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom; anchors.margins: 1
+                        radius: 5
+                        width: (parent.width - 2) * root.deck.stemsProgress
+                        color: Qt.rgba(0.96, 0.73, 0.26, 0.25)
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        font.pixelSize: 11; font.weight: Font.DemiBold
+                        color: root.deck.stemsState === 3 ? Theme.red : Theme.gold
+                        text: root.deck.stemsState === 1 ? ("🧠  Separando stems con IA… " + Math.round(root.deck.stemsProgress * 100) + " %")
+                            : root.deck.stemsState === 3 ? root.deck.stemsError
+                            : (root.deck.stemsAvailable ? "🧠  Separar voz, batería, bajo y melodía" : "Modelo de stems no instalado")
+                    }
+                    MouseArea { anchors.fill: parent; enabled: root.deck.stemsState === 0 || root.deck.stemsState === 3; onClicked: root.deck.prepareStems() }
+                }
+            }
+        }
+
         // ---------- Efectos sincronizados al beat
         RowLayout {
             Layout.fillWidth: true

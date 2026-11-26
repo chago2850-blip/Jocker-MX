@@ -23,7 +23,7 @@
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.5.0-dev"
+#define JOCKER_VERSION "0.6.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {

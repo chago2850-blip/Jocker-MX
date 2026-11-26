@@ -7,7 +7,7 @@ import JockerMX
 ApplicationWindow {
     id: win
     width: 1480
-    height: 980
+    height: 1000
     minimumWidth: 1180
     minimumHeight: 860
     visible: true
@@ -38,6 +38,10 @@ ApplicationWindow {
     Shortcut { sequence: "M"; onActivated: sampler.press(6) }
     Shortcut { sequence: ","; onActivated: sampler.press(7) }
     Shortcut { sequence: "Ctrl+R"; onActivated: recorder.toggle() }
+    Shortcut { sequence: "Shift+Q"; onActivated: deckA.acapella() }
+    Shortcut { sequence: "Shift+W"; onActivated: deckA.instrumental() }
+    Shortcut { sequence: "Shift+O"; onActivated: deckB.acapella() }
+    Shortcut { sequence: "Shift+P"; onActivated: deckB.instrumental() }
     Shortcut { sequence: "Left"; onActivated: mixer.crossfader = Math.max(-1, mixer.crossfader - 0.1) }
     Shortcut { sequence: "Right"; onActivated: mixer.crossfader = Math.min(1, mixer.crossfader + 0.1) }
 
@@ -56,7 +60,7 @@ ApplicationWindow {
         id: scroller
         anchors.fill: parent
         contentWidth: width
-        contentHeight: Math.max(height, 940)
+        contentHeight: Math.max(height, 980)
         interactive: contentHeight > height + 1
         boundsBehavior: Flickable.StopAtBounds
         clip: true
@@ -126,9 +130,9 @@ ApplicationWindow {
         // Decks + mezclador
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 490
-            Layout.maximumHeight: 490
-            Layout.minimumHeight: 490
+            Layout.preferredHeight: 526
+            Layout.maximumHeight: 526
+            Layout.minimumHeight: 526
             Layout.margins: 10
             spacing: 10
             DeckPanel { deck: deckA; Layout.fillWidth: true; Layout.fillHeight: true }

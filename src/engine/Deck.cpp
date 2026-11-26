@@ -3,6 +3,7 @@
 #include "Deck.h"
 
 #include <rubberband/RubberBandStretcher.h>
+#include "stems/StemSeparator.h"
 
 #include <algorithm>
 #include <cmath>
@@ -21,11 +22,23 @@ inline float hermite(float xm1, float x0, float x1, float x2, float t) {
     return ((((a * t) - b) * t + c) * t + x0);
 }
 
-inline float sampleAt(const Track* t, int64_t i, int ch) {
-    if (i < 0 || i >= t->frames) return 0.0f;
-    return t->pcm[static_cast<size_t>(i) * 2 + ch];
-}
 } // namespace
+
+// Muestra i del canal ch con la mezcla de stems aplicada (otros = mezcla − voz − batería − bajo)
+inline float Deck::at(const Track* t, int64_t i, int ch) const {
+    if (i < 0 || i >= t->frames) return 0.0f;
+    const size_t k = static_cast<size_t>(i) * 2 + ch;
+    const float mix = t->pcm[k];
+    if (!m_stemMix) return mix;
+    const float v = m_sd->stem[0][k] * StemData::kScale;
+    const float d = m_sd->stem[1][k] * StemData::kScale;
+    const float b = m_sd->stem[2][k] * StemData::kScale;
+    return m_g[0] * v + m_g[1] * d + m_g[2] * b + m_g[3] * (mix - v - d - b);
+}
+
+inline void Deck::stepStemGains() {
+    for (int s = 0; s < 4; ++s) m_g[s] += (m_tg[s] - m_g[s]) * 0.0025f;   // ~8 ms, sin chasquidos
+}
 
 Deck::Deck(int index) : m_index(index) {}
 Deck::~Deck() = default;
@@ -69,6 +82,16 @@ void Deck::process(float* out, int n) {
         return;
     }
 
+    // Estado de stems para este bloque
+    m_sd = t->stems.load(std::memory_order_acquire);
+    bool anyOff = false;
+    for (int s = 0; s < 4; ++s) {
+        m_tg[s] = stemGain[s].load(std::memory_order_relaxed);
+        anyOff = anyOff || std::abs(m_tg[s] - 1.f) > 1e-4f || std::abs(m_g[s] - 1.f) > 1e-4f;
+    }
+    m_stemMix = m_sd && anyOff && m_sd->frames == t->frames;
+    if (!m_stemMix) for (float& g : m_g) g = m_sd ? g : 1.f;
+
     const bool scratch = scratchActive.load(std::memory_order_relaxed);
     double target = 0.0;
     if (scratch) target = scratchRate.load(std::memory_order_relaxed);
@@ -96,6 +119,7 @@ void Deck::processResample(const Track* t, float* out, int n, double targetRate)
     const double ls = loopStart.load(std::memory_order_relaxed);
     const double le = loopEnd.load(std::memory_order_relaxed);
     for (int i = 0; i < n; ++i) {
+        if (m_stemMix) stepStemGains();
         m_rate += (targetRate - m_rate) * coef;
         if (std::abs(m_rate) < 1e-5 && targetRate == 0.0) {
             m_rate = 0.0;
@@ -105,8 +129,8 @@ void Deck::processResample(const Track* t, float* out, int n, double targetRate)
         const int64_t i0 = static_cast<int64_t>(std::floor(m_pos));
         const float frac = static_cast<float>(m_pos - static_cast<double>(i0));
         for (int ch = 0; ch < 2; ++ch) {
-            out[2 * i + ch] = hermite(sampleAt(t, i0 - 1, ch), sampleAt(t, i0, ch),
-                                      sampleAt(t, i0 + 1, ch), sampleAt(t, i0 + 2, ch), frac);
+            out[2 * i + ch] = hermite(at(t, i0 - 1, ch), at(t, i0, ch),
+                                      at(t, i0 + 1, ch), at(t, i0 + 2, ch), frac);
         }
         m_pos += m_rate;
         if (loop && m_rate > 0 && le > ls && m_pos >= le) m_pos -= (le - ls);
@@ -131,9 +155,10 @@ void Deck::processStretch(const Track* t, float* out, int n, double rate) {
         size_t req = std::min<size_t>(m_rb->getSamplesRequired(), static_cast<size_t>(m_maxBlock));
         if (req == 0) req = 256;
         for (size_t k = 0; k < req; ++k) {
+            if (m_stemMix) stepStemGains();
             const int64_t idx = static_cast<int64_t>(m_pos);
-            m_inL[k] = sampleAt(t, idx, 0);
-            m_inR[k] = sampleAt(t, idx, 1);
+            m_inL[k] = at(t, idx, 0);
+            m_inR[k] = at(t, idx, 1);
             m_pos += 1.0;
             if (loop && le > ls && m_pos >= le) m_pos -= (le - ls);
         }

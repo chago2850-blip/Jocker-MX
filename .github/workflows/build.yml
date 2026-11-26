@@ -113,6 +113,12 @@ jobs:
           arch: android_arm64_v8a
           autodesktop: true
           cache: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-qt683
       - name: NDK
         run: |
           NDK_VER=26.1.10909125
@@ -128,7 +134,9 @@ jobs:
           "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-android -G Ninja -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH="$HOSTQT" \
             -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
             -DJOCKER_BUILD_TESTS=OFF -DQT_ANDROID_BUILD_ALL_ABIS=OFF
-          cmake --build build-android --target apk
+          # Maven Central a veces responde 429 (demasiadas solicitudes): reintentar
+          for i in 1 2 3; do cmake --build build-android --target apk && break; echo "Reintento $i"; sleep 60; done
+          find build-android -name "*.apk" | head
       - name: Firmar APK
         run: |
           APK=$(find build-android -name "*-release-unsigned.apk" -o -name "*-release.apk" | head -1)

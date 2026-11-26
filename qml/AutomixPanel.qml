@@ -21,6 +21,36 @@ Rectangle {
         return h > 0 ? (h + " h " + m + " min") : (m > 0 ? m + " min" : Math.round(s) + " s")
     }
 
+    property int leftView: startupPanel === "programacion" ? 1 : 0   // 0 cola, 1 programación
+    property int editRow: -1          // evento cuyo menú está abierto
+
+    JxMenu {
+        id: actionMenu
+        Instantiator {
+            model: scheduler.actionNames
+            delegate: JxMenuItem { text: modelData; onTriggered: scheduler.setEventAction(root.editRow, index) }
+            onObjectAdded: function(i, o) { actionMenu.insertItem(i, o) }
+            onObjectRemoved: function(i, o) { actionMenu.removeItem(o) }
+        }
+    }
+    JxMenu {
+        id: playlistPick
+        JxMenuItem { text: "(no tienes listas: créalas en la biblioteca)"; enabled: false; visible: library.playlists.length === 0; height: visible ? implicitHeight : 0 }
+        Instantiator {
+            model: library.playlists
+            delegate: JxMenuItem { text: modelData.name + "  (" + modelData.count + ")"; onTriggered: scheduler.setEventParam(root.editRow, modelData.id) }
+            onObjectAdded: function(i, o) { playlistPick.insertItem(i + 1, o) }
+            onObjectRemoved: function(i, o) { playlistPick.removeItem(o) }
+        }
+    }
+    JxMenu {
+        id: fadePick
+        Repeater {
+            model: [10, 20, 30, 60, 120]
+            JxMenuItem { text: "Fundido de " + modelData + " s"; onTriggered: scheduler.setEventParam(root.editRow, modelData) }
+        }
+    }
+
     JxPrompt {
         id: savePrompt
         onAccepted: function(name) { library.createPlaylist(name, automix.queuePaths()) }
@@ -40,20 +70,30 @@ Rectangle {
             RowLayout {
                 Layout.fillWidth: true
                 spacing: 8
-                Text { text: "COLA DE AUTOMIX"; color: Theme.faint; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1.5 }
-                Text { text: automix.queue.count + (automix.queue.count === 1 ? " pista" : " pistas") + (automix.queueSeconds > 0 ? " · " + root.fmtLong(automix.queueSeconds) : ""); color: Theme.dim; font.pixelSize: 11 }
-                Item { Layout.fillWidth: true }
-                JxButton { text: "➕  Agregar lo visible"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 150
+                JxButton { text: "COLA"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 70; accent: Theme.gold
+                           active: root.leftView === 0; onClicked: root.leftView = 0 }
+                JxButton { text: "⏰  PROGRAMACIÓN" + (scheduler.events.length ? "  " + scheduler.events.length : ""); fontSize: 11
+                           Layout.preferredHeight: 26; Layout.preferredWidth: 150; accent: Theme.gold
+                           active: root.leftView === 1; onClicked: root.leftView = 1 }
+                Text { visible: root.leftView === 0
+                       text: automix.queue.count + (automix.queue.count === 1 ? " pista" : " pistas") + (automix.queueSeconds > 0 ? " · " + root.fmtLong(automix.queueSeconds) : ""); color: Theme.dim; font.pixelSize: 11 }
+                Text { visible: root.leftView === 1; Layout.fillWidth: true; elide: Text.ElideRight
+                       text: scheduler.nextText; color: Theme.dim; font.pixelSize: 11 }
+                Item { Layout.fillWidth: true; visible: root.leftView === 0 }
+                JxButton { visible: root.leftView === 1; text: "➕  Nuevo evento"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 132
+                           accent: Theme.green; onClicked: scheduler.addEvent() }
+                JxButton { visible: root.leftView === 0; text: "➕  Agregar lo visible"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 150
                            onClicked: automix.add(library.visiblePaths()) }
-                JxButton { text: "🔀  Al azar"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 92; onClicked: automix.shuffle() }
-                JxButton { text: "💾  Guardar lista"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 124
+                JxButton { visible: root.leftView === 0; text: "🔀  Al azar"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 92; onClicked: automix.shuffle() }
+                JxButton { visible: root.leftView === 0; text: "💾  Guardar lista"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 124
                            enabledLook: automix.queue.count > 0
                            onClicked: if (automix.queue.count) savePrompt.ask("Guardar la cola como lista", "Automix " + Qt.formatDate(new Date(), "dd/MM"), "Guardar") }
-                JxButton { text: "Vaciar"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 70; accent: Theme.red
+                JxButton { visible: root.leftView === 0; text: "Vaciar"; fontSize: 11; Layout.preferredHeight: 26; Layout.preferredWidth: 70; accent: Theme.red
                            onClicked: automix.clear() }
             }
 
             Rectangle {
+                visible: root.leftView === 0
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 radius: 8
@@ -141,15 +181,114 @@ Rectangle {
                     }
                 }
             }
+
+            // ---------- Programación de eventos
+            Rectangle {
+                visible: root.leftView === 1
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                radius: 8
+                color: Theme.bg2
+                border.color: Theme.border
+                ListView {
+                    id: evList
+                    anchors.fill: parent
+                    anchors.margins: 6
+                    clip: true
+                    spacing: 4
+                    model: scheduler.events
+                    boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                    footer: Text {
+                        visible: scheduler.lastMessage.length > 0
+                        height: visible ? 26 : 0
+                        verticalAlignment: Text.AlignVCenter
+                        leftPadding: 6
+                        text: "Último disparo: " + scheduler.lastMessage
+                        color: Theme.green; font.pixelSize: 11
+                    }
+                    delegate: Rectangle {
+                        id: ev
+                        required property int index
+                        required property var modelData
+                        width: evList.width - 10
+                        height: 34
+                        radius: 6
+                        color: ev.modelData.enabled ? Theme.panel2 : "transparent"
+                        border.color: Theme.border
+                        opacity: ev.modelData.enabled ? 1.0 : 0.55
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8; anchors.rightMargin: 6
+                            spacing: 8
+                            Rectangle {     // activado
+                                width: 30; height: 16; radius: 8
+                                color: ev.modelData.enabled ? Qt.rgba(0.33, 0.88, 0.54, 0.35) : Theme.bg2
+                                border.color: ev.modelData.enabled ? Theme.green : Theme.border
+                                Rectangle { width: 12; height: 12; radius: 6; y: 2; x: ev.modelData.enabled ? 16 : 2
+                                            color: ev.modelData.enabled ? Theme.green : Theme.faint }
+                                MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor
+                                            onClicked: scheduler.setEventEnabled(ev.index, !ev.modelData.enabled) }
+                            }
+                            Rectangle {     // hora
+                                Layout.preferredWidth: 62; Layout.preferredHeight: 26; radius: 6
+                                color: Theme.bg2; border.color: timeIn.activeFocus ? Theme.gold : Theme.border
+                                TextInput {
+                                    id: timeIn
+                                    anchors.fill: parent
+                                    horizontalAlignment: TextInput.AlignHCenter; verticalAlignment: TextInput.AlignVCenter
+                                    text: ev.modelData.time
+                                    inputMask: "99:99"
+                                    color: Theme.gold; font.pixelSize: 15; font.weight: Font.Bold; font.family: "monospace"
+                                    selectByMouse: true
+                                    onEditingFinished: if (text !== ev.modelData.time) scheduler.setEventTime(ev.index, text)
+                                }
+                            }
+                            JxButton {      // acción
+                                Layout.fillWidth: true; Layout.preferredHeight: 26
+                                text: ev.modelData.actionName + "  ▾"; fontSize: 12
+                                onClicked: { root.editRow = ev.index; actionMenu.popup() }
+                            }
+                            JxButton {      // parámetro (lista o duración del fundido)
+                                visible: ev.modelData.paramLabel.length > 0
+                                Layout.preferredWidth: 150; Layout.preferredHeight: 26
+                                text: ev.modelData.paramLabel + "  ▾"; fontSize: 11; accent: Theme.cyan
+                                onClicked: { root.editRow = ev.index; (ev.modelData.action === 2 ? playlistPick : fadePick).popup() }
+                            }
+                            JxButton { Layout.preferredWidth: 58; Layout.preferredHeight: 26; text: ev.modelData.once ? "1 vez" : "diario"; fontSize: 10
+                                       accent: Theme.gold; active: ev.modelData.once; onClicked: scheduler.setEventOnce(ev.index, !ev.modelData.once) }
+                            JxButton { Layout.preferredWidth: 30; Layout.preferredHeight: 26; text: "▶"; fontSize: 11; accent: Theme.green
+                                       onClicked: scheduler.runNow(ev.index) }
+                            JxButton { Layout.preferredWidth: 30; Layout.preferredHeight: 26; text: "✕"; fontSize: 11; accent: Theme.red
+                                       onClicked: scheduler.removeEvent(ev.index) }
+                        }
+                    }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: evList.count === 0
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "No hay eventos programados.\nEj.: 21:00 reproducir la lista «Cena» · 23:30 empezar a grabar · 02:00 bajar volumen y parar.\nPulsa «Nuevo evento» para crear uno."
+                        color: Theme.faint; font.pixelSize: 13
+                    }
+                }
+            }
         }
 
         Rectangle { Layout.fillHeight: true; width: 1; color: Theme.border }
 
-        // ---------- Controles
-        ColumnLayout {
-            Layout.preferredWidth: 236
-            Layout.maximumWidth: 236
+
+        // ---------- Controles (desplazables si el panel es bajo)
+        Flickable {
+            Layout.preferredWidth: 244
+            Layout.maximumWidth: 244
             Layout.fillHeight: true
+            clip: true
+            contentHeight: ctl.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded; width: 6 }
+        ColumnLayout {
+            id: ctl
+            width: 236
             spacing: 8
 
             Rectangle {   // gran botón de encendido
@@ -203,6 +342,17 @@ Rectangle {
                 }
             }
 
+            Text { text: "ESTILO DE TRANSICIÓN"; color: Theme.faint; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1.2; Layout.topMargin: 2 }
+            Grid {
+                columns: 3
+                spacing: 4
+                Repeater {
+                    model: automix.styleNames
+                    JxButton { width: 74; height: 26; fontSize: 10; text: modelData.toUpperCase(); accent: Theme.magenta
+                               active: automix.style === index; onClicked: automix.style = index }
+                }
+            }
+
             component Toggle: Rectangle {
                 id: tg
                 property string label: ""
@@ -225,13 +375,16 @@ Rectangle {
             Toggle { label: "Volver al tempo original"; on: automix.tempoReturn; onToggled: automix.tempoReturn = !automix.tempoReturn }
             Toggle { label: "Repetir la cola"; on: automix.repeat; onToggled: automix.repeat = !automix.repeat }
 
-            Item { Layout.fillHeight: true }
             Text {
                 Layout.fillWidth: true
+                Layout.bottomMargin: 6
                 wrapMode: Text.WordWrap
-                text: "AUTO mezcla la outro de una pista con la intro de la siguiente para que su cuerpo entre justo al terminar. Sincroniza tempo y fase si los BPM son compatibles (±8 %). Ctrl+M enciende/apaga · Ctrl+Intro mezcla ya."
+                text: ["Auto: mezcla si los tempos encajan; si no, eco.", "Mezcla: crossfade sincronizado con intercambio de graves.",
+                       "Filtro: la que sale se queda sin graves mientras la nueva se abre.", "Eco: la que sale se repite un compás y la nueva entra de golpe.",
+                       "Corte: cambio seco en el compás justo."][automix.style] + "  Ctrl+M on/off · Ctrl+Intro mezclar ya."
                 color: Theme.faint; font.pixelSize: 10
             }
+        }
         }
     }
 }

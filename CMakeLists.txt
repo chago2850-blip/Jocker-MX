@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.8.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.8.0-dev")
+project(JockerMX VERSION 0.9.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.9.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -114,6 +114,7 @@ qt_add_qml_module(jocker-mx
     src/app/RecordingController.h src/app/RecordingController.cpp
     src/app/AutomixPlan.h src/app/AutomixPlan.cpp
     src/app/AutomixController.h src/app/AutomixController.cpp
+    src/app/EventScheduler.h src/app/EventScheduler.cpp
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
@@ -293,7 +294,8 @@ if(JOCKER_BUILD_TESTS)
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
     src/app/AutomixPlan.h src/app/AutomixPlan.cpp
-    src/app/AutomixController.h src/app/AutomixController.cpp)
+    src/app/AutomixController.h src/app/AutomixController.cpp
+    src/app/EventScheduler.h src/app/EventScheduler.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
   target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY)
   target_include_directories(jx-tests SYSTEM PRIVATE third_party/eigen)

@@ -9,6 +9,7 @@
 #include "app/DeckController.h"
 #include "app/Mixer.h"
 #include "app/AutomixController.h"
+#include "app/EventScheduler.h"
 #include "app/AutomixPlan.h"
 #include "analysis/Structure.h"
 #include "app/RecordingController.h"
@@ -825,9 +826,74 @@ int main(int argc, char** argv) {
                 }
                 am2.setEnabled(false);
                 a.pause(); b.pause();
-                CHECK(planTxt.startsWith("outro"), "el Automix anuncia la mezcla «%s»", qPrintable(planTxt));
+                CHECK(planTxt.contains("outro → intro"), "el Automix anuncia la mezcla «%s»", qPrintable(planTxt));
                 CHECK(std::abs(startPos - plan.outStart) < 0.1, "empieza en la outro planeada (%.2f s, previsto %.2f s)", startPos, plan.outStart);
                 CHECK(std::abs(bAtEnd - introEnd2) < 0.15, "al terminar, la nueva está en su cuerpo (%.2f s, previsto %.2f s)", bAtEnd, introEnd2);
+
+                // Estilos de transición: corte, eco y filtro
+                struct StyleRun { double aAtCut = -1, bAtCut = -1, maxWet = 0, maxFilt = 0, xfAtTail = 9;
+                                  bool restored = false, finished = false; QString plan; };
+                auto runStyle = [&](int style) {
+                    StyleRun r;
+                    if (a.playing()) a.pause();
+                    if (b.playing()) b.pause();
+                    a.setFxType(0); a.setFxWet(0.5); a.setFilter(0); b.setFilter(0);
+                    jx::Mixer mx3(&eng, {&a, &b});
+                    mx3.setCrossfader(-1);
+                    jx::AutomixController am3(&a, &b, &mx3);
+                    am3.clear(); am3.setTransitionBeats(0); am3.setStyle(style);
+                    am3.setTempoReturn(false); am3.setRepeat(false);
+                    am3.add({sp, sp2});
+                    am3.setEnabled(true);
+                    bool jumpedS = false, mixingPrev = false, bWasPlaying = false;
+                    QElapsedTimer w; w.start();
+                    for (double sim = 0; sim < 60 && w.elapsed() < 120000;) {
+                        QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
+                        if (a.loading() || b.loading()) { QCoreApplication::processEvents(QEventLoop::AllEvents, 20); continue; }
+                        am3.step();
+                        if (!jumpedS && am3.activeDeck() == 0 && !am3.planText().isEmpty() && a.playing()) {
+                            r.plan = am3.planText();
+                            a.seekSeconds(plan.outStart - 4.0);
+                            jumpedS = true;
+                        }
+                        renderSecs(0.025);
+                        sim += 0.025;
+                        if (b.playing() && !bWasPlaying) { r.aAtCut = a.position(); r.bAtCut = b.position(); }
+                        if (am3.mixing()) {
+                            r.maxWet = std::max(r.maxWet, a.fxType() == 1 ? a.fxWet() : 0.0);
+                            r.maxFilt = std::max(r.maxFilt, a.filter());
+                            if (b.playing() && !a.playing() && r.xfAtTail > 1) r.xfAtTail = mx3.crossfader();
+                        }
+                        bWasPlaying = b.playing();
+                        if (!am3.mixing() && (mixingPrev || (jumpedS && am3.activeDeck() == 1))) {
+                            r.finished = true;
+                            r.restored = a.fxType() == 0 && std::abs(a.fxWet() - 0.5) < 1e-6 && std::abs(a.filter()) < 1e-6 &&
+                                         std::abs(b.filter()) < 1e-6 && mx3.crossfader() > 0.99 && !a.playing();
+                            break;
+                        }
+                        mixingPrev = am3.mixing();
+                    }
+                    am3.setEnabled(false);
+                    a.pause(); b.pause();
+                    return r;
+                };
+                const double cutAt = plan.outStart + plan.length;
+                const StyleRun rc = runStyle(jx::AutomixController::StyleCut);
+                CHECK(rc.plan.startsWith("Corte"), "estilo corte anunciado («%s»)", qPrintable(rc.plan));
+                CHECK(std::abs(rc.aAtCut - cutAt) < 0.1 && std::abs(rc.bAtCut - introEnd2) < 0.1,
+                      "corte: la nueva entra en su cuerpo justo al final de la outro (A %.2f/%.2f s, B %.2f/%.2f s)",
+                      rc.aAtCut, cutAt, rc.bAtCut, introEnd2);
+                CHECK(rc.finished && rc.restored, "corte: crossfader en B y deck A en pausa");
+                const StyleRun re = runStyle(jx::AutomixController::StyleEcho);
+                const double bar1 = 4 * 60.0 / st->bpm;
+                CHECK(re.maxWet > 0.5, "eco: repeticiones en el deck que sale (mezcla de eco %.0f %%)", re.maxWet * 100);
+                CHECK(std::abs(re.aAtCut - cutAt) < 0.1 && std::abs(re.bAtCut - introEnd2) < 0.1,
+                      "eco: el corte cae al final de la outro (A %.2f s, previsto %.2f s; eco desde %.2f s)", re.aAtCut, cutAt, cutAt - bar1);
+                CHECK(std::abs(re.xfAtTail) < 0.2, "eco: la cola del eco se oye tras el corte (crossfader %.2f)", re.xfAtTail);
+                CHECK(re.finished && re.restored, "eco: efecto, mezcla y crossfader restaurados al terminar");
+                const StyleRun rf = runStyle(jx::AutomixController::StyleFilter);
+                CHECK(rf.maxFilt > 0.6, "filtro: el deck que sale se va a paso alto (%.2f)", rf.maxFilt);
+                CHECK(rf.finished && rf.restored, "filtro: filtros restaurados al terminar");
             }
             // El deck expone las secciones a la interfaz y salta a ellas
             a.load(sp);
@@ -837,6 +903,87 @@ int main(int argc, char** argv) {
             a.tick();
             CHECK(a.sectionIndex() == 3, "saltar al drop (sección %d)", a.sectionIndex());
         }
+    }
+
+
+    std::printf("\n[18] Programador de eventos\n");
+    {
+        if (a.playing()) a.pause();
+        if (b.playing()) b.pause();
+        QSettings().remove("scheduler/events");
+        jx::Mixer mxs(&eng, {&a, &b});
+        jx::AutomixController ams(&a, &b, &mxs);
+        ams.clear();
+        const qint64 pl = jx::LibraryDb::createPlaylist("Cena");
+        jx::LibraryDb::setPlaylistPaths(pl, {tmp.filePath("t124.wav"), tmp.filePath("t128.wav")});
+        QDateTime fake(QDate(2026, 12, 31), QTime(21, 59, 30));
+        int firedCount = 0;
+        {
+            jx::EventScheduler sc(&ams, &a, &b, &mxs, nullptr);
+            sc.setClock([&]() { return fake; });
+            QObject::connect(&sc, &jx::EventScheduler::fired, [&](const QString&) { ++firedCount; });
+            const int i = sc.addEvent();
+            CHECK(sc.setEventTime(i, "22:00") && !sc.setEventTime(i, "25:99"), "hora válida aceptada y hora inválida rechazada");
+            sc.setEventAction(i, jx::EventScheduler::PlayPlaylist);
+            sc.setEventParam(i, pl);
+            CHECK(sc.nextText().contains("22:00") && sc.nextText().contains("Cena"), "próximo evento: %s", qPrintable(sc.nextText()));
+            sc.check();
+            CHECK(firedCount == 0 && !ams.enabled(), "no se dispara antes de su hora");
+            fake = QDateTime(QDate(2026, 12, 31), QTime(22, 0, 4));
+            sc.check();
+            CHECK(firedCount == 1 && ams.enabled() && ams.queue().count() == 1 && (a.loading() || b.loading()),
+                  "a las 22:00 pone la lista «Cena» en el Automix (la primera ya se está cargando)");
+            sc.check();
+            CHECK(firedCount == 1, "no se repite en el mismo día");
+            ams.setEnabled(false);
+            ams.clear();
+            fake = QDateTime(QDate(2027, 1, 1), QTime(22, 0, 40));
+            sc.check();
+            CHECK(firedCount == 2 && ams.enabled(), "se repite al día siguiente");
+            ams.setEnabled(false);
+            // Un evento de una sola vez se desactiva solo; uno desactivado no se dispara.
+            const int j = sc.addEvent();
+            sc.setEventTime(j, "23:15");
+            sc.setEventAction(j, jx::EventScheduler::AutomixOn);
+            sc.setEventOnce(j, true);
+            const int k = sc.addEvent();
+            sc.setEventTime(k, "23:15");
+            sc.setEventAction(k, jx::EventScheduler::MixNow);
+            sc.setEventEnabled(k, false);
+            fake = QDateTime(QDate(2027, 1, 1), QTime(23, 15, 1));
+            sc.check();
+            CHECK(firedCount == 3 && ams.enabled() && !sc.list()[j].enabled, "evento de una sola vez: se dispara y se desactiva");
+            ams.setEnabled(false);
+            // Un evento perdido (app cerrada) no se dispara horas después.
+            fake = QDateTime(QDate(2027, 1, 2), QTime(23, 59, 0));
+            sc.check();
+            CHECK(firedCount == 3, "un evento perdido no se dispara tarde");
+        }
+        {
+            jx::EventScheduler sc2(&ams, &a, &b, &mxs, nullptr);
+            CHECK(sc2.list().size() == 3 && sc2.list()[0].time == QTime(22, 0) && sc2.list()[0].param == pl,
+                  "los eventos se guardan y se recuperan (%d)", int(sc2.list().size()));
+            // Bajar volumen y parar
+            a.load(tmp.filePath("t124.wav"));
+            waitLoaded(a);
+            a.play();
+            mxs.setMasterVolume(0.8);
+            const int f = sc2.addEvent();
+            sc2.setEventAction(f, jx::EventScheduler::FadeOutStop);
+            sc2.setEventParam(f, 1);
+            sc2.runNow(f);
+            CHECK(sc2.fading(), "fundido en marcha");
+            QElapsedTimer w; w.start();
+            double minVol = 1;
+            while (sc2.fading() && w.elapsed() < 5000) {
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+                if (sc2.fading()) minVol = std::min(minVol, mxs.masterVolume());
+            }
+            CHECK(!sc2.fading() && minVol < 0.05 && !a.playing() && std::abs(mxs.masterVolume() - 0.8) < 1e-6,
+                  "baja el volumen hasta silencio, para los decks y deja el volumen como estaba (mín. %.2f)", minVol);
+        }
+        QSettings().remove("scheduler/events");
+        jx::LibraryDb::deletePlaylist(pl);
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

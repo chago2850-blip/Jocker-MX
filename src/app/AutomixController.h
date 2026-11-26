@@ -67,6 +67,8 @@ class AutomixController : public QObject {
     Q_PROPERTY(QString nextTitle READ nextTitle NOTIFY stateChanged)
     Q_PROPERTY(bool nextSynced READ nextSynced NOTIFY stateChanged)
     Q_PROPERTY(QString planText READ planText NOTIFY stateChanged)       // cómo será la próxima mezcla
+    Q_PROPERTY(int style READ style WRITE setStyle NOTIFY settingsChanged)   // 0 auto, 1 mezcla, 2 filtro, 3 eco, 4 corte
+    Q_PROPERTY(QStringList styleNames READ styleNames CONSTANT)
     Q_PROPERTY(double queueSeconds READ queueSeconds NOTIFY queueChanged)
 
 public:
@@ -93,6 +95,11 @@ public:
     QString nextTitle() const { return m_nextTitle; }
     bool nextSynced() const { return m_nextSynced; }
     QString planText() const { return m_planText; }
+    enum Style { StyleAuto = 0, StyleBlend, StyleFilter, StyleEcho, StyleCut, StyleCount };
+    int style() const { return m_style; }
+    void setStyle(int s);
+    QStringList styleNames() const;
+    static QString styleName(int s);
     double queueSeconds() const { return m_queue.totalDuration(); }
 
     Q_INVOKABLE void toggle() { setEnabled(!m_enabled); }
@@ -116,6 +123,7 @@ signals:
 
 private:
     enum class State { Idle, Starting, Playing, Mixing };
+    enum class Phase { Blend, EchoLead, Tail };   // fases dentro de una mezcla
     DeckController* deck(int i) const { return i == 0 ? m_a : m_b; }
     void setStatus(const QString& s);
     void saveQueue();
@@ -125,6 +133,9 @@ private:
     void updateMix();
     void finishMix();
     void restoreEq();
+    void doCut();
+    double cutPoint() const;           // donde termina la transición (segundos de la pista que sale)
+    double leadSeconds() const;        // anticipación del eco antes del corte
     double side(int d) const { return d == 0 ? -1.0 : 1.0; }
 
     DeckController* m_a;
@@ -135,6 +146,16 @@ private:
 
     bool m_enabled = false;
     int m_beats = 0;                    // 0 = automático por estructura
+    int m_style = StyleAuto;
+    int m_activeStyle = StyleBlend;     // estilo elegido para la mezcla preparada
+    bool m_planStructural = false;
+    Phase m_phase = Phase::Blend;
+    double m_cutAt = 0, m_leadStart = 0, m_tailStart = 0, m_tailLen = 0;
+    double m_savedFilter[2] = {0, 0};
+    bool m_filterTouched = false;
+    int m_savedFxType = 0;
+    double m_savedFxWet = 0, m_savedFxBeats = 1;
+    bool m_fxTouched = false;
     bool m_bassSwap = true, m_tempoReturn = true, m_repeat = false;
     QStringList m_played;               // para el modo repetir
 

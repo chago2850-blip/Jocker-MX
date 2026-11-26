@@ -79,7 +79,8 @@ Las fases se solapan; la columna "Meses" indica la ventana principal.
 ### F8 · Automix, editores y Sandbox (meses 13-17)
 - Automix con detección de estructura (intro/outro/drops) y transiciones por estilo; Event Scheduler.
   - ✅ **0.7.0-dev**: cola de Automix, salto de silencios, salida en compás, sync de tempo y fase, intercambio de graves, fundido para tempos incompatibles, listas de reproducción. 
-  - ✅ **0.8.0-dev**: detección de estructura (intro/cuerpo/break/drop/outro), Automix AUTO outro→intro, franja de secciones con salto cuantizado. Pendiente: estilos de transición y Event Scheduler.
+  - ✅ **0.8.0-dev**: detección de estructura (intro/cuerpo/break/drop/outro), Automix AUTO outro→intro, franja de secciones con salto cuantizado. 
+  - ✅ **0.9.0-dev**: estilos de transición (mezcla, filtro, eco, corte, auto) y programador de eventos (Event Scheduler).
 - Editores: BPM/beatgrid, POI, Automix, Pads, Samples, Tags, Letras, Track Cleaner, Video.
 - Sandbox (bus de preescucha futuro) con indicador de posición real.
 

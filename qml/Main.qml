@@ -164,7 +164,7 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.margins: 10
             Layout.topMargin: 4
-            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" ? 2 : 0)
+            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : 0)
             LibraryPanel {}
             SamplerPanel {}
             AutomixPanel {}

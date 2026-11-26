@@ -138,6 +138,7 @@ AutomixController::AutomixController(DeckController* a, DeckController* b, Mixer
     m_bassSwap = s.value("automix/bassSwap", true).toBool();
     m_tempoReturn = s.value("automix/tempoReturn", true).toBool();
     m_repeat = s.value("automix/repeat", false).toBool();
+    m_style = std::clamp(s.value("automix/style", 0).toInt(), 0, StyleCount - 1);
     m_queue.setPaths(s.value("automix/queue").toStringList());
     connect(&m_queue, &AutomixQueue::countChanged, this, [this]() { saveQueue(); emit queueChanged(); });
     connect(&m_queue, &QAbstractItemModel::rowsMoved, this, [this]() { saveQueue(); });
@@ -180,6 +181,32 @@ void AutomixController::setTempoReturn(bool on) {
     if (on == m_tempoReturn) return;
     m_tempoReturn = on;
     QSettings().setValue("automix/tempoReturn", on);
+    emit settingsChanged();
+}
+
+QString AutomixController::styleName(int s) {
+    switch (s) {
+    case StyleAuto: return QStringLiteral("Auto");
+    case StyleBlend: return QStringLiteral("Mezcla");
+    case StyleFilter: return QStringLiteral("Filtro");
+    case StyleEcho: return QStringLiteral("Eco");
+    case StyleCut: return QStringLiteral("Corte");
+    default: return {};
+    }
+}
+
+QStringList AutomixController::styleNames() const {
+    QStringList l;
+    for (int i = 0; i < StyleCount; ++i) l << styleName(i);
+    return l;
+}
+
+void AutomixController::setStyle(int s) {
+    s = std::clamp(s, 0, StyleCount - 1);
+    if (s == m_style) return;
+    m_style = s;
+    QSettings().setValue("automix/style", s);
+    if (m_state == State::Playing) m_nextReady = false;   // volver a planear con el estilo nuevo
     emit settingsChanged();
 }
 
@@ -258,7 +285,7 @@ void AutomixController::step() {
         const double pos = d->position();
         const bool ended = d->reachedEnd() || pos >= t->durationSec() - 0.02;
         if (ended) {
-            if (m_nextReady) { beginMix(true); finishMix(); }
+            if (m_nextReady) { m_activeStyle = StyleCut; beginMix(true); }   // se acabó la pista: corte directo
             else if (m_nextPath.isEmpty() && m_queue.count() == 0) {
                 m_state = State::Idle;
                 m_cur = -1;
@@ -280,7 +307,9 @@ void AutomixController::step() {
                 m_mixNowAt = pos;
             }
         }
-        const double target = m_mixNowAt >= 0 ? m_mixNowAt : m_curPts.mixOut;
+        const bool cutStyle = m_activeStyle == StyleCut || m_activeStyle == StyleEcho;
+        double target = m_mixNowAt >= 0 ? m_mixNowAt : (cutStyle ? cutPoint() : m_curPts.mixOut);
+        if (cutStyle) target -= leadSeconds() * (t->bpm > 0 && d->bpm() > 0 ? d->bpm() / t->bpm : 1.0);
         const double rate = t->bpm > 0 && d->bpm() > 0 ? d->bpm() / t->bpm : 1.0;
         const double left = (target - pos) / std::max(0.1, rate);
         if (std::abs(left - m_secondsToMix) > 0.05) { m_secondsToMix = left; emit progressChanged(); }
@@ -391,9 +420,12 @@ void AutomixController::prepareNext() {
             m_curPts.transition = plan.length;
             m_nextPts.mixIn = plan.inStart;
         }
-        m_planText = !m_nextSynced ? QStringLiteral("fundido · tempos distintos")
-                   : plan.structural ? plan.describe
-                   : QStringLiteral("%1 beats").arg(plan.beats);
+        m_planStructural = plan.structural && plan.outStart > cur->position() + 0.5;
+        m_activeStyle = m_style == StyleAuto ? (m_nextSynced ? StyleBlend : StyleEcho) : m_style;
+        const QString how = !m_nextSynced ? QStringLiteral("tempos distintos")
+                          : plan.structural ? plan.describe
+                          : QStringLiteral("%1 beats").arg(plan.beats);
+        m_planText = styleName(m_activeStyle) + QStringLiteral(" · ") + how;
     }
     o->seekSeconds(m_nextPts.mixIn);
     m_nextReady = true;
@@ -402,12 +434,57 @@ void AutomixController::prepareNext() {
     emit stateChanged();
 }
 
+double AutomixController::cutPoint() const {
+    return m_curPts.mixOut + m_curPts.transition;
+}
+
+double AutomixController::leadSeconds() const {
+    if (m_activeStyle != StyleEcho || m_cur < 0) return 0.0;
+    const Track* t = deck(m_cur)->track();
+    return t && t->bpm > 0 ? 4 * 60.0 / t->bpm : 1.5;   // un compás de eco antes del corte
+}
+
 void AutomixController::beginMix(bool now) {
     DeckController* d = deck(m_cur);
     DeckController* o = deck(1 - m_cur);
     const Track* t = d->track();
     const double pos = d->position();
 
+    m_savedEqLow[0] = m_a->eqLow();
+    m_savedEqLow[1] = m_b->eqLow();
+    m_savedFilter[0] = m_a->filter();
+    m_savedFilter[1] = m_b->filter();
+    m_mixNowAt = -1;
+    m_progress = 0;
+    m_secondsToMix = -1;
+    m_state = State::Mixing;
+    emit progressChanged();
+
+    // ---- Corte y eco: la nueva entra de golpe en el punto de corte (con eco, tras un compás de repeticiones)
+    if (m_activeStyle == StyleCut || m_activeStyle == StyleEcho) {
+        m_mixStartPos = pos;
+        if (m_activeStyle == StyleEcho) {
+            m_savedFxType = d->fxType();
+            m_savedFxWet = d->fxWet();
+            m_savedFxBeats = d->fxBeats();
+            m_fxTouched = true;
+            d->setFxType(1);            // eco
+            d->setFxBeats(0.75);
+            d->setFxWet(0.0);
+            m_leadStart = pos;
+            const double rate = t && t->bpm > 0 && d->bpm() > 0 ? d->bpm() / t->bpm : 1.0;
+            m_cutAt = now ? pos + leadSeconds() * rate : pos + leadSeconds() * rate;
+            if (t) m_cutAt = std::min(m_cutAt, t->durationSec());
+            m_phase = Phase::EchoLead;
+            setStatus(QStringLiteral("Eco %1 → %2").arg(d->name(), o->name()));
+        } else {
+            setStatus(QStringLiteral("Corte %1 → %2").arg(d->name(), o->name()));
+            doCut();
+        }
+        return;
+    }
+
+    // ---- Mezcla y filtro: las dos suenan a la vez durante la transición
     if (m_nextSynced) {
         o->matchTempo();
         // Entrar con la misma fase que el deck que sale (el compás de salida empieza en un beat).
@@ -418,11 +495,10 @@ void AutomixController::beginMix(bool now) {
         m_phaseFixTicks = 0;
     }
     o->play();
-
-    m_savedEqLow[0] = m_a->eqLow();
-    m_savedEqLow[1] = m_b->eqLow();
     m_eqTouched = m_bassSwap && m_nextSynced;
     if (m_eqTouched) o->setEqLow(-1.0);
+    m_filterTouched = m_activeStyle == StyleFilter;
+    if (m_filterTouched) o->setFilter(-0.75);   // la nueva entra apagada (paso bajo) y se va abriendo
 
     double len = m_curPts.transition;
     if (now) len = t && t->bpm > 0 ? (m_beats > 0 ? m_beats : 16) * 60.0 / t->bpm : 8.0;
@@ -430,18 +506,56 @@ void AutomixController::beginMix(bool now) {
     len = std::min(len, std::max(0.0, t0 - pos));   // nunca más allá del final
     m_mixStartPos = pos;
     m_mixLen = len;
-    m_mixNowAt = -1;
-    m_progress = 0;
-    m_secondsToMix = -1;
+    m_phase = Phase::Blend;
     m_mixer->setCrossfader(side(m_cur));
-    m_state = State::Mixing;
-    setStatus(QStringLiteral("Mezclando %1 → %2").arg(d->name(), o->name()));
-    emit progressChanged();
+    setStatus(QStringLiteral("%1 %2 → %3").arg(styleName(m_activeStyle), d->name(), o->name()));
+}
+
+void AutomixController::doCut() {
+    DeckController* d = deck(m_cur);
+    DeckController* o = deck(1 - m_cur);
+    const Track* dt = d->track();
+    const Track* ot = o->track();
+    d->pause();   // el eco (si lo hay) sigue sonando: los efectos van antes del fader
+    double in = m_nextPts.mixIn;
+    if (m_nextSynced && ot && dt && dt->bpm > 0 && ot->bpm > 0) {
+        o->matchTempo();
+        // Con estructura, la nueva entra directamente en su cuerpo (el final de su intro).
+        if (m_planStructural) in += m_curPts.transition / (60.0 / dt->bpm) * (60.0 / ot->bpm);
+    }
+    o->seekSeconds(in);
+    o->play();
+    if (m_activeStyle == StyleEcho && m_fxTouched) {
+        m_mixer->setCrossfader(0.0);   // las dos abiertas: se oye la cola del eco
+        m_tailStart = in;
+        m_tailLen = ot && ot->bpm > 0 ? 4 * 60.0 / ot->bpm : 2.0;
+        m_phase = Phase::Tail;
+        return;
+    }
+    finishMix();
 }
 
 void AutomixController::updateMix() {
     DeckController* d = deck(m_cur);
     DeckController* o = deck(1 - m_cur);
+
+    if (m_phase == Phase::EchoLead) {
+        const double span = std::max(0.05, m_cutAt - m_leadStart);
+        const double p = std::clamp((d->position() - m_leadStart) / span, 0.0, 1.0);
+        d->setFxWet(0.65 * smoothstep(p * 1.3));
+        if (std::abs(p - m_progress) > 0.002) { m_progress = p * 0.5; emit progressChanged(); }
+        if (p >= 1.0 || !d->playing() || d->reachedEnd()) doCut();
+        return;
+    }
+    if (m_phase == Phase::Tail) {
+        const double q = std::clamp((o->position() - m_tailStart) / std::max(0.05, m_tailLen), 0.0, 1.0);
+        m_mixer->setCrossfader(side(1 - m_cur) * smoothstep(q));
+        m_progress = 0.5 + 0.5 * q;
+        emit progressChanged();
+        if (q >= 1.0 || !o->playing()) finishMix();
+        return;
+    }
+
     double p = 1.0;
     if (m_mixLen > 0.01 && d->playing() && !d->reachedEnd())
         p = std::clamp((d->position() - m_mixStartPos) / m_mixLen, 0.0, 1.0);
@@ -454,15 +568,33 @@ void AutomixController::updateMix() {
         o->setEqLow(-1.0 + (m_savedEqLow[oi] + 1.0) * q);
         d->setEqLow(m_savedEqLow[m_cur] + (-1.0 - m_savedEqLow[m_cur]) * q);
     }
+    if (m_filterTouched) {   // la que sale se va quedando sin graves (paso alto), la que entra se abre
+        const int oi = 1 - m_cur;
+        d->setFilter(m_savedFilter[m_cur] + (0.85 - m_savedFilter[m_cur]) * smoothstep(p));
+        o->setFilter(-0.75 + (m_savedFilter[oi] + 0.75) * smoothstep(p / 0.6));
+    }
     if (std::abs(p - m_progress) > 0.002 || p >= 1.0) { m_progress = p; emit progressChanged(); }
     if (p >= 1.0) finishMix();
 }
 
 void AutomixController::restoreEq() {
-    if (!m_eqTouched) return;
-    m_a->setEqLow(m_savedEqLow[0]);
-    m_b->setEqLow(m_savedEqLow[1]);
-    m_eqTouched = false;
+    if (m_eqTouched) {
+        m_a->setEqLow(m_savedEqLow[0]);
+        m_b->setEqLow(m_savedEqLow[1]);
+        m_eqTouched = false;
+    }
+    if (m_filterTouched) {
+        m_a->setFilter(m_savedFilter[0]);
+        m_b->setFilter(m_savedFilter[1]);
+        m_filterTouched = false;
+    }
+    if (m_fxTouched && m_cur >= 0) {
+        DeckController* d = deck(m_cur);
+        d->setFxType(m_savedFxType);
+        d->setFxWet(m_savedFxWet);
+        d->setFxBeats(m_savedFxBeats);
+        m_fxTouched = false;
+    }
 }
 
 void AutomixController::finishMix() {

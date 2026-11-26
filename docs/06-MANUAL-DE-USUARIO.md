@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.8.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.9.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -104,10 +104,28 @@ El Automix toca y mezcla solo la música de su **cola**, usando los decks A y B 
    - si los BPM son compatibles (±8 %, o medio/doble tiempo) **iguala tempo y fase**, cruza el crossfader e **intercambia los graves** a mitad de la mezcla para que no choquen los bajos;
    - si no son compatibles, hace un **fundido** sin sincronizar.
 4. **Duración de la mezcla**: **AUTO** (recomendado) usa la estructura: empieza en la **outro** de la pista que sale y arranca la nueva en el punto exacto de su **intro** para que su cuerpo o drop entre justo cuando la anterior termina (hasta 16 compases). Si alguna pista no tiene intro/outro clara, o los tempos no son compatibles, usa el punto fijo. También puedes fijar 8, 16 o 32 beats. Bajo la pista que sigue verás cómo será la mezcla (p. ej. «outro → intro · 8 compases»). **⏩ Mezclar ya** (o `Ctrl+Intro`) mezcla en el siguiente compás; **Saltar** descarta la pista preparada y prepara la siguiente.
-5. Opciones: **Intercambiar graves**, **Volver al tempo original** (tras una mezcla sincronizada, la pista regresa poco a poco a su tempo, ≈1 % cada 10 s) y **Repetir la cola**.
+5. **Estilo de transición**:
+   - **Auto** (recomendado): *Mezcla* si los tempos se pueden sincronizar; *Eco* si no (evita que choquen dos ritmos distintos).
+   - **Mezcla**: las dos suenan juntas, sincronizadas, cruzando el crossfader e intercambiando los graves a la mitad.
+   - **Filtro**: como la mezcla, pero la que sale se va quedando sin graves (paso alto) y la que entra empieza apagada (paso bajo) y se abre.
+   - **Eco**: la que sale suena con eco durante su último compás, se detiene en el compás exacto y la nueva entra de golpe (en su cuerpo, si tiene intro); la cola del eco se apaga de fondo.
+   - **Corte**: cambio seco en el compás exacto, sin solapar.
+   Al terminar, el Automix deja el EQ, el filtro y el efecto del deck como estaban.
+6. Opciones: **Intercambiar graves**, **Volver al tempo original** (tras una mezcla sincronizada, la pista regresa poco a poco a su tempo, ≈1 % cada 10 s) y **Repetir la cola**.
 - En la barra superior, **AUTO** muestra cuánto falta para la siguiente mezcla. Puedes tocar los decks, efectos y sampler mientras el Automix trabaja; si pausas el deck que suena, el Automix espera.
 - **💾 Guardar lista** guarda la cola como lista de reproducción. La cola se recuerda al cerrar la app.
 - El Automix también se puede asignar al controlador MIDI: encender/apagar, mezclar ya y saltar.
+
+## 5 ter. Programar eventos
+En el panel **🔁 Automix**, pestaña **⏰ PROGRAMACIÓN**, puedes dejar acciones que se ejecuten solas a una hora:
+- **Encender / Apagar Automix**, **Automix: mezclar ya**.
+- **Reproducir lista en Automix**: reemplaza la cola por la lista elegida y enciende el Automix; si ya suena algo, mezcla desde ahí.
+- **Empezar a grabar / Detener la grabación**.
+- **Bajar volumen y parar**: fundido del volumen maestro (10 s a 2 min), luego apaga el Automix y pausa los decks, y deja el volumen como estaba para la próxima vez.
+
+Cada evento tiene: interruptor de activado, hora (escríbela como `21:30`), acción, lista o duración si aplica, **diario** o **1 vez** (se desactiva solo al cumplirse), **▶** para probarlo ahora y **✕** para borrarlo. Arriba se muestra el próximo evento; abajo, el último que se disparó.
+- La app tiene que estar abierta. Si estaba cerrada a la hora del evento, no lo ejecuta tarde (sólo hasta 90 segundos después de la hora).
+- Los eventos se guardan al cerrar la app.
 
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:
@@ -150,4 +168,4 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 10. Próximamente
-Más efectos, guardar stems en disco, estilos de transición del Automix (eco, filtro, corte), video y karaoke, transmisión en vivo e interfaz táctil para teléfono. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Más efectos, guardar stems en disco, video y karaoke, transmisión en vivo e interfaz táctil para teléfono. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

@@ -6,6 +6,7 @@
 #include "app/RecordingController.h"
 #include "app/AutomixController.h"
 #include "app/EventScheduler.h"
+#include "app/KaraokeController.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
@@ -25,7 +26,7 @@
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.9.0-dev"
+#define JOCKER_VERSION "0.10.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -47,7 +48,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion)", "nombre");
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion, karaoke)", "nombre");
     QCommandLineOption optQueue("queue", "Agregar un archivo a la cola de Automix (se puede repetir)", "archivo");
     QCommandLineOption optAutomix("automix", "Encender el Automix al iniciar");
     cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix});
@@ -77,6 +78,7 @@ int main(int argc, char* argv[]) {
     jx::AutomixController automix(&deckA, &deckB, &mixer);
     midi.setAutomix(&automix);
     jx::EventScheduler scheduler(&automix, &deckA, &deckB, &mixer, &recorder);
+    jx::KaraokeController karaoke(&deckA, &deckB, &mixer);
     if (cli.isSet(optQueue)) { automix.clear(); automix.add(cli.values(optQueue)); }
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
     QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
@@ -107,6 +109,7 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("recorder"), &recorder);
     qml.rootContext()->setContextProperty(QStringLiteral("automix"), &automix);
     qml.rootContext()->setContextProperty(QStringLiteral("scheduler"), &scheduler);
+    qml.rootContext()->setContextProperty(QStringLiteral("karaoke"), &karaoke);
     qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,

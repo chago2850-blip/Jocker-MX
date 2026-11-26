@@ -39,6 +39,7 @@ ApplicationWindow {
     Shortcut { sequence: ","; onActivated: sampler.press(7) }
     Shortcut { sequence: "Ctrl+R"; onActivated: recorder.toggle() }
     Shortcut { sequence: "Ctrl+M"; onActivated: automix.toggle() }
+    Shortcut { sequence: "Ctrl+K"; onActivated: karaoke.startNext() }
     Shortcut { sequences: ["Ctrl+Return", "Ctrl+Enter"]; onActivated: automix.mixNow() }
     Shortcut { sequence: "Shift+Q"; onActivated: deckA.acapella() }
     Shortcut { sequence: "Shift+W"; onActivated: deckA.instrumental() }
@@ -147,7 +148,7 @@ ApplicationWindow {
             Layout.leftMargin: 14
             spacing: 6
             Repeater {
-                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix"]
+                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix", "🎤  Karaoke"]
                 Rectangle {
                     width: 128; height: 26; radius: 6
                     color: bottomTabs.currentIndex === index ? Theme.panel : "transparent"
@@ -164,10 +165,11 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.margins: 10
             Layout.topMargin: 4
-            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : 0)
+            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : (startupPanel === "karaoke" ? 3 : 0))
             LibraryPanel {}
             SamplerPanel {}
             AutomixPanel {}
+            KaraokePanel {}
         }
     }
     }

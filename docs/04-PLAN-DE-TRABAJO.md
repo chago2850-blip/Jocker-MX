@@ -74,6 +74,7 @@ Las fases se solapan; la columna "Meses" indica la ventana principal.
 - Capas: texto, *song titler*, logo propio, cámara, captura de pantalla, imágenes.
 - Visualizaciones (projectM + shaders propios), videoskins QML, salida a segunda pantalla, Syphon/Spout.
 - Karaoke: CDG/MP3+G, KAR, LRC, video; Karaoke Engine (cola de cantantes, tonos, música de fondo, próximo cantante).
+  - ✅ **0.10.0-dev**: CD+G (MP3+G) y LRC, cambio de tono por semitonos, rotación de cantantes con tono por turno y pantalla del público. Pendiente: KAR, música de fondo entre turnos, video.
 - Skin **Escenario**.
 
 ### F8 · Automix, editores y Sandbox (meses 13-17)

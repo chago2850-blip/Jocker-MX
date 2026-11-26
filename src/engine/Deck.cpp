@@ -98,8 +98,14 @@ void Deck::process(float* out, int n) {
     else if (playing.load(std::memory_order_relaxed))
         target = baseRate() * (1.0 + nudge.load(std::memory_order_relaxed));
 
-    const bool stretch = !scratch && keyLock.load(std::memory_order_relaxed) && target > 0.2 &&
-                         m_rb && n <= m_maxBlock;
+    const int shift = keyShift.load(std::memory_order_relaxed);
+    const bool lock = keyLock.load(std::memory_order_relaxed);
+    const bool stretch = !scratch && (lock || shift != 0) && target > 0.2 && m_rb && n <= m_maxBlock;
+    if (stretch) {
+        // Cambio de tono: con key lock sólo los semitonos; sin él, también sube/baja con el tempo (como un vinilo).
+        const double scale = std::pow(2.0, shift / 12.0) * (lock ? 1.0 : target);
+        if (std::abs(scale - m_lastPitchScale) > 1e-6) { m_rb->setPitchScale(scale); m_lastPitchScale = scale; }
+    }
     if (stretch) {
         if (!m_wasStretching) m_rb->reset();
         m_wasStretching = true;

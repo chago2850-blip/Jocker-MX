@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.9.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.9.0-dev")
+project(JockerMX VERSION 0.10.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.10.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -109,12 +109,16 @@ qt_add_qml_module(jocker-mx
     src/app/Mixer.h src/app/Mixer.cpp
     src/app/LibraryModel.h src/app/LibraryModel.cpp
     src/ui/WaveformItem.h src/ui/WaveformItem.cpp
+    src/ui/CdgItem.h src/ui/CdgItem.cpp
+    src/karaoke/Cdg.h src/karaoke/Cdg.cpp
+    src/karaoke/Lrc.h src/karaoke/Lrc.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
     src/app/AutomixPlan.h src/app/AutomixPlan.cpp
     src/app/AutomixController.h src/app/AutomixController.cpp
     src/app/EventScheduler.h src/app/EventScheduler.cpp
+    src/app/KaraokeController.h src/app/KaraokeController.cpp
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
@@ -133,6 +137,9 @@ qt_add_qml_module(jocker-mx
     qml/JxMenu.qml
     qml/JxMenuItem.qml
     qml/JxPrompt.qml
+    qml/KaraokeView.qml
+    qml/KaraokeScreen.qml
+    qml/KaraokePanel.qml
   RESOURCES
     resources/icon-256.png
     resources/logo-3d-256.png
@@ -286,6 +293,7 @@ if(JOCKER_BUILD_TESTS)
     tests/engine_tests.cpp
     src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
     src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/Structure.cpp src/analysis/PlatformDecoder.cpp
+    src/karaoke/Cdg.cpp src/karaoke/Lrc.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp
@@ -295,13 +303,14 @@ if(JOCKER_BUILD_TESTS)
     src/app/RecordingController.h src/app/RecordingController.cpp
     src/app/AutomixPlan.h src/app/AutomixPlan.cpp
     src/app/AutomixController.h src/app/AutomixController.cpp
-    src/app/EventScheduler.h src/app/EventScheduler.cpp)
+    src/app/EventScheduler.h src/app/EventScheduler.cpp
+    src/app/KaraokeController.h src/app/KaraokeController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
   target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY)
   target_include_directories(jx-tests SYSTEM PRIVATE third_party/eigen)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()
-  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
+  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
   add_test(NAME motor COMMAND jx-tests)
 endif()

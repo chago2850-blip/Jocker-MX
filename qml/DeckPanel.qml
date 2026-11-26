@@ -57,6 +57,18 @@ Rectangle {
                     elide: Text.ElideRight
                 }
             }
+            Rectangle {     // karaoke (CD+G / letra) y tono del cantante
+                visible: root.deck.hasCdg || root.deck.hasLyrics || root.deck.keyShift !== 0
+                width: kTxt.implicitWidth + 12; height: 22; radius: 5
+                color: Qt.rgba(1, 0.18, 0.55, 0.14); border.color: Theme.magenta
+                Text {
+                    id: kTxt
+                    anchors.centerIn: parent
+                    text: (root.deck.hasCdg || root.deck.hasLyrics ? "🎤" : "♪") +
+                          (root.deck.keyShift !== 0 ? " " + (root.deck.keyShift > 0 ? "+" : "") + root.deck.keyShift : "")
+                    color: Theme.magenta; font.pixelSize: 11; font.weight: Font.Bold
+                }
+            }
             Rectangle {     // tonalidad (Camelot), verde si combina con el otro deck
                 visible: root.deck.musicalKey.length > 0
                 readonly property var other: root.deck.index === 0 ? deckB : deckA

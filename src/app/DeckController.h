@@ -3,6 +3,8 @@
 #pragma once
 
 #include "analysis/Structure.h"
+#include "karaoke/Cdg.h"
+#include "karaoke/Lrc.h"
 
 #include "engine/AudioEngine.h"
 #include "stems/StemsService.h"
@@ -44,6 +46,7 @@ class DeckController : public QObject {
     Q_PROPERTY(double pitchRange READ pitchRange WRITE setPitchRange NOTIFY tempoChanged)
     Q_PROPERTY(double pitchPercent READ pitchPercent NOTIFY tempoChanged)
     Q_PROPERTY(bool keyLock READ keyLock WRITE setKeyLock NOTIFY keyLockChanged)
+    Q_PROPERTY(int keyShift READ keyShift WRITE setKeyShift NOTIFY keyLockChanged)   // semitonos -6..+6
     Q_PROPERTY(bool syncLock READ syncLock WRITE setSyncLock NOTIFY syncLockChanged)
     Q_PROPERTY(double cuePoint READ cuePoint NOTIFY cuesChanged)
     Q_PROPERTY(QVariantList hotCues READ hotCues NOTIFY cuesChanged)
@@ -75,6 +78,12 @@ class DeckController : public QObject {
     Q_PROPERTY(QVariantList stemOn READ stemOn NOTIFY stemsChanged)
     Q_PROPERTY(QVariantList sections READ sections NOTIFY sectionsChanged)   // [{start, end, kind, name, bars}]
     Q_PROPERTY(int sectionIndex READ sectionIndex NOTIFY sectionIndexChanged)
+    // Karaoke: gráficos CD+G o letra .lrc junto al archivo de audio (mismo nombre)
+    Q_PROPERTY(bool hasCdg READ hasCdg NOTIFY karaokeChanged)
+    Q_PROPERTY(bool hasLyrics READ hasLyrics NOTIFY karaokeChanged)
+    Q_PROPERTY(QStringList lyricsLines READ lyricsLines NOTIFY karaokeChanged)
+    Q_PROPERTY(int lyricLine READ lyricLine NOTIFY lyricChanged)
+    Q_PROPERTY(double lyricProgress READ lyricProgress NOTIFY lyricChanged)
 
 public:
     DeckController(AudioEngine* engine, int index, QObject* parent = nullptr);
@@ -91,6 +100,8 @@ public:
     QString musicalKey() const;
     QString keyName() const;
     Q_INVOKABLE bool keyCompatibleWith(const QString& camelot) const;
+    int keyShift() const { return m_deck.keyShift.load(); }
+    void setKeyShift(int s);
     QString filePath() const;
     QString error() const { return m_error; }
     double duration() const;
@@ -167,6 +178,14 @@ public:
     Q_INVOKABLE void seekSeconds(double s);
     Q_INVOKABLE void jumpToSection(int i);   // salta al inicio de la sección (respeta el compás si suena)
     QVariantList sections() const { return m_sectionsVar; }
+    bool hasCdg() const { return m_cdg.isLoaded(); }
+    bool hasLyrics() const { return !m_lyrics.isEmpty(); }
+    QStringList lyricsLines() const { return m_lyricsLines; }
+    int lyricLine() const { return m_lyricLine; }
+    double lyricProgress() const { return m_lyricProgress; }
+    const QImage& cdgFrame();                     // cuadro CD+G en la posición actual
+    QRgb cdgBorderColor() const { return m_cdg.borderColor(); }
+    const Lyrics& lyrics() const { return m_lyrics; }
     int sectionIndex() const { return m_sectionIndex; }
     const std::vector<Section>& sectionList() const { return m_sections; }
     Q_INVOKABLE void play();               // reproducir (no alterna)
@@ -212,6 +231,8 @@ signals:
     void stemsChanged();
     void stemsProgressChanged();
     void sectionsChanged();
+    void karaokeChanged();
+    void lyricChanged();
     void sectionIndexChanged();
     void trackLoaded(const QString& path, double bpm, const QString& key);
     void played(const QString& path);
@@ -253,6 +274,13 @@ private:
 
     void applyStemGains();
     void updateSections();
+    void loadKaraoke(const QString& audioPath);
+    void updateLyric(double seconds);
+    CdgPlayer m_cdg;
+    Lyrics m_lyrics;
+    QStringList m_lyricsLines;
+    int m_lyricLine = -1;
+    double m_lyricProgress = 0;
     std::vector<Section> m_sections;
     QVariantList m_sectionsVar;
     int m_sectionIndex = -1;

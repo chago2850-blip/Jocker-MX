@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.9.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.10.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -127,6 +127,20 @@ Cada evento tiene: interruptor de activado, hora (escríbela como `21:30`), acci
 - La app tiene que estar abierta. Si estaba cerrada a la hora del evento, no lo ejecuta tarde (sólo hasta 90 segundos después de la hora).
 - Los eventos se guardan al cerrar la app.
 
+## 5 quater. Karaoke
+**Archivos.** Jocker-MX usa los formatos de karaoke más comunes, que van **al lado** de la canción y con **el mismo nombre**:
+- `Cancion.mp3` + `Cancion.cdg` → gráficos **CD+G** (el formato clásico de los discos de karaoke, «MP3+G»).
+- `Cancion.mp3` + `Cancion.lrc` → **letra sincronizada** (también el formato con tiempos por palabra).
+En la biblioteca esas canciones llevan 🎤, y en el deck aparece el distintivo 🎤 al cargarlas. Si vienen en un .zip, descomprímelo primero en la carpeta de tu música.
+
+**Panel 🎤 Karaoke.**
+- **Vista previa** del deck del cantante (gráficos o letra con barrido dorado).
+- **TONO −/+**: sube o baja de −6 a +6 semitonos sin cambiar la velocidad, para acomodar la canción a la voz. Al cargar otra canción el tono vuelve a 0.
+- **📺 Pantalla del público**: abre una ventana aparte para la TV o el proyector; arrástrala a esa pantalla y haz **doble clic** para ponerla a pantalla completa (Esc para salir). Muestra los gráficos o la letra en grande, quién canta y quién sigue.
+- **Rotación**: agrega cantantes arrastrando una canción al panel o desde la biblioteca (clic derecho → **🎤 Agregar a karaoke…**) y escribe su nombre. Cada turno guarda su **tono**; puedes reordenar (▲▼), cambiar el nombre (doble clic) o quitar.
+- **SIGUIENTE CANTANTE** (o `Ctrl+K`): carga su canción en el deck libre **desde el principio** y con su tono, sin cortar al cantante actual. Con **Reproducir al llamar** activado, además mueve el crossfader a ese deck y la arranca.
+- La rotación se guarda al cerrar la app.
+
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:
 - `Mezcla … .wav`: tu mezcla completa en WAV de 24 bits (lo que sale por el master, con efectos y sampler).
@@ -160,6 +174,7 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 | `Z X C V B N M ,` | Pads 1-8 del sampler |
 | `Ctrl+R` | Iniciar / detener la grabación |
 | `Ctrl+M` | Encender / apagar el Automix |
+| `Ctrl+K` | Karaoke: siguiente cantante |
 | `Ctrl+Intro` | Automix: mezclar en el siguiente compás |
 
 ## 9. Solución de problemas

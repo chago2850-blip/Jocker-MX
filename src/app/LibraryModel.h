@@ -35,7 +35,7 @@ class LibraryModel : public QAbstractListModel {
 public:
     enum Roles {
         PathRole = Qt::UserRole + 1, TitleRole, ArtistRole, AlbumRole, GenreRole, KeyRole, BpmRole,
-        DurationRole, FormatRole, PlaysRole, LastPlayedRole, FileNameRole
+        DurationRole, FormatRole, PlaysRole, LastPlayedRole, FileNameRole, KaraokeRole
     };
 
     explicit LibraryModel(QObject* parent = nullptr);
@@ -111,6 +111,7 @@ private:
     int m_analysisTotal = 0;
     std::atomic<bool> m_cancelAnalysis{false};
     qint64 m_playlistId = 0;
+    mutable QHash<QString, bool> m_karaokeCache;   // ¿tiene .cdg/.lrc al lado? (sólo filas visibles)
     QVariantList m_playlists;
     void reloadPlaylists();
 };

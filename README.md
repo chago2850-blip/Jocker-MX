@@ -10,15 +10,16 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.9.0-dev (alfa).** Nuevo: **estilos de transición** del Automix (mezcla, filtro, eco y corte) y **programador de eventos** (acciones automáticas a una hora). Ya estaban la **estructura de pistas**, el **Automix** y las **listas de reproducción**. Funcionan **stems con IA**, 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-090-dev).
+> **Estado: 0.10.0-dev (alfa).** Nuevo: **karaoke** — gráficos **CD+G** (MP3+CDG), letras sincronizadas **.LRC**, **cambio de tono** por semitonos, **rotación de cantantes** y **pantalla para el público**. Ya estaban los estilos de transición, el programador de eventos, la estructura de pistas, el Automix y las listas. Funcionan **stems con IA**, 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-0100-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-sampler.png" alt="Sampler de Jocker-MX" width="49%"> <img src="assets/screenshots/jocker-mx-midi.png" alt="Controladores MIDI" width="49%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-automix.png" alt="Automix de Jocker-MX mezclando" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-estructura.png" alt="Secciones de cada pista y Automix por estructura" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-programacion.png" alt="Programador de eventos" width="100%"></p>
+<p align="center"><img src="assets/screenshots/jocker-mx-karaoke.png" alt="Karaoke CD+G con rotación de cantantes" width="100%"></p>
 
-## Lo que ya funciona en 0.9.0-dev
+## Lo que ya funciona en 0.10.0-dev
 - **2 decks** con carga de **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
@@ -34,6 +35,7 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Automix**: cola de reproducción que se mezcla sola entre los decks A y B. Salta los silencios, sale al inicio de un compás, **sincroniza tempo y fase** cuando los BPM son compatibles (±8 %, también medio/doble tiempo), cruza el crossfader e **intercambia los graves** a mitad de la mezcla; si no son compatibles hace un fundido. Mezcla de 4/8/16/32 beats, **Mezclar ya** (en el siguiente compás), saltar, repetir la cola, regreso suave al tempo original y cuenta regresiva en la barra superior.
 - **Estructura de cada pista**: detecta **intro, cuerpo, break, drop y outro** por compases; se ve como una franja de colores bajo la forma de onda (clic = saltar a esa sección sin perder el compás) y el nombre de la sección actual junto al indicador de beats.
 - **Automix AUTO**: con la estructura, mezcla la **outro** de la pista que sale con la **intro** de la que entra, calculando la duración para que el cuerpo de la nueva entre justo cuando la anterior termina.
+- **Karaoke**: si junto a la canción hay un **.cdg** o un **.lrc** con el mismo nombre, se carga solo (🎤 en la biblioteca y en el deck). Gráficos CD+G completos (bloques, XOR, desplazamiento, paleta, borde) y letras LRC con barrido por línea o por palabra. **Tono** de −6 a +6 semitonos sin cambiar el tempo. **Rotación de cantantes** con nombre, canción y tono de cada uno; «Siguiente cantante» la carga en el deck libre desde el principio. **Pantalla del público** en una ventana aparte (TV o segundo monitor, pantalla completa con doble clic) con quién canta y quién sigue.
 - **Estilos de transición**: **Mezcla** (crossfade sincronizado con intercambio de graves), **Filtro** (la que sale pierde los graves con un paso alto mientras la nueva se abre), **Eco** (la que sale se repite un compás y la nueva entra de golpe en su cuerpo, con la cola del eco de fondo) y **Corte** (cambio seco en el compás exacto). **Auto** elige mezcla si los tempos encajan y eco si no.
 - **Programador de eventos**: acciones a una hora, diarias o de una sola vez: encender/apagar el Automix, reproducir una lista, mezclar ya, empezar/detener la grabación y **bajar el volumen y parar** con fundido. Se guardan entre sesiones y se pueden probar al momento.
 - **Listas de reproducción** en la biblioteca: crear, renombrar, reordenar, buscar dentro, arrastrar pistas sobre una lista, mandarlas al Automix o guardar la cola como lista.
@@ -44,7 +46,7 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Grabación** de la mezcla (botón **REC** o `Ctrl+R`) en WAV de 24 bits, con **lista de canciones** (.txt) y hoja **.cue** con los tiempos de cada pista.
 - **Analizar todo**: calcula BPM, tonalidad y duración de toda la biblioteca en segundo plano.
 - **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 65 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
-- Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader · `Ctrl+M` Automix · `Ctrl+Intro` mezclar ya.
+- Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader · `Ctrl+M` Automix · `Ctrl+Intro` mezclar ya · `Ctrl+K` siguiente cantante.
 
 ### Instalar
 Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-blip/Jocker-MX/releases) (lo genera automáticamente GitHub Actions):

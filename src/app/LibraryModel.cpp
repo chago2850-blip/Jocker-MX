@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Santiago Miguel y colaboradores de Jocker-MX
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LibraryModel.h"
+#include "KaraokeController.h"
 
 #include "analysis/Analyzer.h"
 #include "analysis/KeyDetector.h"
@@ -77,6 +78,13 @@ QVariant LibraryModel::data(const QModelIndex& index, int role) const {
     case PlaysRole: return r.playCount;
     case LastPlayedRole: return r.lastPlayed;
     case FileNameRole: return QFileInfo(r.path).fileName();
+    case KaraokeRole: {
+        auto it = m_karaokeCache.constFind(r.path);
+        if (it != m_karaokeCache.constEnd()) return *it;
+        const bool k = KaraokeController::hasKaraokeFiles(r.path);
+        m_karaokeCache.insert(r.path, k);
+        return k;
+    }
     default: return {};
     }
 }
@@ -84,7 +92,8 @@ QVariant LibraryModel::data(const QModelIndex& index, int role) const {
 QHash<int, QByteArray> LibraryModel::roleNames() const {
     return {{PathRole, "path"},     {TitleRole, "title"},    {ArtistRole, "artist"},   {AlbumRole, "album"},
             {GenreRole, "genre"},   {KeyRole, "musicalKey"}, {BpmRole, "bpm"},         {DurationRole, "duration"},
-            {FormatRole, "format"}, {PlaysRole, "plays"},    {LastPlayedRole, "lastPlayed"}, {FileNameRole, "fileName"}};
+            {FormatRole, "format"}, {PlaysRole, "plays"},    {LastPlayedRole, "lastPlayed"}, {FileNameRole, "fileName"},
+            {KaraokeRole, "karaoke"}};
 }
 
 void LibraryModel::setFolder(const QString& f) {
@@ -204,6 +213,7 @@ void LibraryModel::sortBy(const QString& key) {
 }
 
 void LibraryModel::refresh() {
+    m_karaokeCache.clear();
     const QString prefix = m_folder.isEmpty() ? QString() : m_folder + '/';
     beginResetModel();
     const auto view = static_cast<LibraryDb::View>(m_view);

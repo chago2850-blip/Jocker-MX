@@ -10,6 +10,9 @@
 #include "app/Mixer.h"
 #include "app/AutomixController.h"
 #include "app/EventScheduler.h"
+#include "app/KaraokeController.h"
+#include "karaoke/Cdg.h"
+#include "karaoke/Lrc.h"
 #include "app/AutomixPlan.h"
 #include "analysis/Structure.h"
 #include "app/RecordingController.h"
@@ -138,6 +141,35 @@ static void writeStructuredWav(const QString& path, double bpm, double firstBeat
         w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(l[i], -1.f, 1.f) * 30000)));
         w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(r[i], -1.f, 1.f) * 30000)));
     }
+}
+
+
+// Paquete CD+G (24 bytes): comando 0x09, instrucción y 16 bytes de datos.
+static void cdgPacket(QByteArray& f, int index, uint8_t instr, std::initializer_list<uint8_t> data) {
+    if (f.size() < (index + 1) * 24) f.append(QByteArray((index + 1) * 24 - f.size(), '\0'));
+    char* p = f.data() + index * 24;
+    p[0] = 0x09; p[1] = char(instr);
+    int i = 0;
+    for (uint8_t d : data) p[4 + i++] = char(d);
+}
+static void writeSineWav(const QString& path, double hz, double secs, int sr = 44100) {
+    const int n = int(secs * sr);
+    QFile f(path);
+    f.open(QIODevice::WriteOnly);
+    auto w32 = [&](uint32_t v) { f.write(reinterpret_cast<const char*>(&v), 4); };
+    auto w16 = [&](uint16_t v) { f.write(reinterpret_cast<const char*>(&v), 2); };
+    f.write("RIFF"); w32(36 + n * 4); f.write("WAVEfmt "); w32(16); w16(1); w16(2); w32(sr); w32(sr * 4); w16(4); w16(16);
+    f.write("data"); w32(n * 4);
+    for (int i = 0; i < n; ++i) {
+        const int16_t v = int16_t(std::sin(2 * M_PI * hz * i / sr) * 12000);
+        w16(uint16_t(v)); w16(uint16_t(v));
+    }
+}
+// Frecuencia dominante por cruces por cero (canal izquierdo)
+static double zeroCrossHz(const std::vector<float>& st, int sr) {
+    int c = 0;
+    for (size_t i = 2; i < st.size(); i += 2) if ((st[i - 2] < 0) != (st[i] < 0)) ++c;
+    return c / 2.0 / (double(st.size() / 2) / sr);
 }
 
 static double rms(const std::vector<float>& v) {
@@ -984,6 +1016,122 @@ int main(int argc, char** argv) {
         }
         QSettings().remove("scheduler/events");
         jx::LibraryDb::deletePlaylist(pl);
+    }
+
+
+    std::printf("\n[19] Karaoke\n");
+    {
+        // --- CD+G sintético
+        QByteArray cdg;
+        cdgPacket(cdg, 0, 30, {0, 0, 60, 0, 3, 48});                        // colores: 0 negro, 1 rojo, 2 verde
+        cdgPacket(cdg, 1, 1, {0});                                            // borrar pantalla con color 0
+        cdgPacket(cdg, 150, 6, {0, 1, 1, 1, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F});
+        cdgPacket(cdg, 210, 38, {0, 1, 1, 1, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F});
+        cdgPacket(cdg, 240, 2, {2});                                          // borde verde
+        cdgPacket(cdg, 255, 6, {0, 1, 2, 2, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F, 0x3F});
+        cdgPacket(cdg, 270, 20, {0, 0x20, 0});                                // desplazar 6 px a la izquierda
+        cdgPacket(cdg, 299, 0, {});
+        jx::CdgPlayer cp;
+        CHECK(cp.loadData(cdg) && std::abs(cp.duration() - 1.0) < 1e-9, "CD+G cargado (%.2f s)", cp.duration());
+        cp.frameAt(0.4);
+        CHECK(cp.colorIndexAt(6, 12) == 0, "antes del bloque la pantalla está vacía");
+        const QImage& im = cp.frameAt(0.6);
+        CHECK(cp.colorIndexAt(6, 12) == 1 && cp.colorIndexAt(11, 23) == 1 && cp.colorIndexAt(12, 12) == 0 &&
+              im.pixel(8, 15) == qRgb(255, 0, 0), "bloque de 6×12 dibujado en rojo en su sitio");
+        cp.frameAt(0.75);
+        CHECK(cp.colorIndexAt(6, 12) == 0, "bloque XOR lo borra");
+        cp.frameAt(0.85);
+        CHECK(cp.colorIndexAt(0, 0) == 2 && cp.borderColor() == qRgb(0, 255, 0) && cp.colorIndexAt(150, 100) == 0,
+              "borde verde sin tocar el centro");
+        cp.frameAt(0.95);
+        CHECK(cp.colorIndexAt(6, 24) == 1 && cp.colorIndexAt(12, 24) == 0, "desplazamiento a la izquierda de 6 px");
+        cp.frameAt(0.6);
+        CHECK(cp.colorIndexAt(6, 12) == 1 && cp.colorIndexAt(0, 0) == 0, "retroceder vuelve a dibujar el estado correcto");
+
+        // --- Letras LRC (con desfase, marcas repetidas y tiempos por palabra)
+        jx::Lyrics ly;
+        ly.parse("[ti:Cielito]\n[ar:Trad]\n[offset:500]\n[00:01.00]Uno\n[00:03.00][00:09.00]Coro repetido\n"
+                 "[00:05.50]<00:05.50>Ay <00:06.00>ay <00:06.50>ay\nlínea sin tiempo\n");
+        CHECK(ly.lines().size() == 4 && ly.title() == "Cielito" && ly.artist() == "Trad", "LRC: 4 líneas y etiquetas");
+        CHECK(ly.lineAt(0.2) == -1 && ly.lineAt(3.0) == 1 && ly.lines()[1].text == "Coro repetido" && ly.lineAt(9.0) == 3,
+              "LRC: línea correcta en cada momento (desfase de 0,5 s aplicado)");
+        const double pw = ly.progressAt(5.75, 2);
+        CHECK(pw > 0.45 && pw < 0.55, "LRC: avance por palabra (%.2f)", pw);
+        const double pl = ly.progressAt(1.5, 0);
+        CHECK(pl > 0.2 && pl < 0.8, "LRC: barrido proporcional sin tiempos por palabra (%.2f)", pl);
+
+        // --- El deck encuentra los archivos de karaoke junto al audio
+        const QString kw = tmp.filePath("karaoke.wav");
+        writeTestWav(kw, 120, 0.5, 10);
+        { QFile f(tmp.filePath("karaoke.lrc")); f.open(QIODevice::WriteOnly);
+          f.write("[00:01.00]Primera\n[00:02.50]Segunda línea\n[00:06.00]Tercera\n"); }
+        { QFile f(tmp.filePath("karaoke.CDG")); f.open(QIODevice::WriteOnly); f.write(cdg); }
+        CHECK(jx::KaraokeController::hasKaraokeFiles(kw) && !jx::KaraokeController::hasKaraokeFiles(tmp.filePath("t124.wav")),
+              "detecta qué canciones tienen karaoke");
+        if (a.playing()) a.pause();
+        a.load(kw);
+        CHECK(waitLoaded(a) && a.hasCdg() && a.hasLyrics() && a.lyricsLines().size() == 3, "el deck carga .CDG y .lrc del mismo nombre");
+        a.seekSeconds(3.0);
+        renderSecs(0.05);
+        a.tick();
+        CHECK(a.lyricLine() == 1 && a.lyricProgress() > 0.1, "línea actual de la letra en el deck (%d, %.2f)", a.lyricLine(), a.lyricProgress());
+        a.seekSeconds(0.6);
+        renderSecs(0.02);
+        const QImage fr = a.cdgFrame();
+        CHECK(!fr.isNull() && fr.pixel(8, 15) == qRgb(255, 0, 0), "cuadro CD+G sincronizado con la posición del deck");
+
+        // --- Cambio de tono (semitonos) con el motor real
+        const QString sine = tmp.filePath("la440.wav");
+        writeSineWav(sine, 440.0, 6.0);
+        if (b.playing()) b.pause();
+        b.load(sine);
+        waitLoaded(b);
+        b.setVolume(1.0);
+        b.setKeyShift(5);
+        CHECK(b.keyShift() == 5, "tono +5 semitonos");
+        b.setKeyShift(9);
+        CHECK(b.keyShift() == 6, "el tono se limita a ±6");
+        b.setKeyShift(5);
+        b.seekSeconds(0.5);
+        b.play();
+        renderSecs(0.6);
+        std::vector<float> cap;
+        renderSecs(1.0, &cap);
+        b.pause();
+        const double hz = zeroCrossHz(cap, sr), expect = 440.0 * std::pow(2.0, 5 / 12.0);
+        CHECK(std::abs(hz - expect) / expect < 0.02, "suena %.1f Hz (esperado %.1f Hz)", hz, expect);
+        b.load(sine);
+        waitLoaded(b);
+        CHECK(b.keyShift() == 0, "al cargar otra pista el tono vuelve a 0");
+
+        // --- Rotación de cantantes
+        QSettings().remove("karaoke/singers");
+        jx::Mixer mxk(&eng, {&a, &b});
+        a.pause(); b.pause();
+        jx::KaraokeController kc(&a, &b, &mxk);
+        kc.setAutoPlay(true);
+        kc.addSinger("Ana", kw, -2);
+        kc.addSinger("Luis", tmp.filePath("t124.wav"), 1);
+        CHECK(kc.count() == 2 && kc.singers()[0].toMap().value("karaoke").toBool(), "dos cantantes en la rotación");
+        CHECK(kc.startNext() && kc.currentName() == "Ana", "turno de Ana");
+        const int dk = kc.karaokeDeck();
+        jx::DeckController& kd = dk == 0 ? a : b;
+        QElapsedTimer wk; wk.start();
+        while ((kd.loading() || !kd.playing()) && wk.elapsed() < 10000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+        renderSecs(0.05);   // aplicar en el motor la posición pedida
+        CHECK(kd.playing() && kd.keyShift() == -2 && kd.position() < 0.5 && kd.hasCdg(),
+              "su canción suena desde el principio, en su tono (-2) y con gráficos (%d, %d, %.2f s, %d)",
+              kd.playing(), kd.keyShift(), kd.position(), kd.hasCdg());
+        CHECK(std::abs(mxk.crossfader() - (dk == 0 ? -1.0 : 1.0)) < 1e-9, "crossfader hacia el deck del karaoke");
+        CHECK(kc.startNext() && kc.currentName() == "Luis" && kc.karaokeDeck() == 1 - dk, "el siguiente va al otro deck sin cortar a Ana");
+        CHECK(!kc.startNext(), "sin más cantantes");
+        {
+            jx::KaraokeController kc2(&a, &b, &mxk);
+            CHECK(kc2.count() == 0 && kc2.autoPlay(), "la rotación y las opciones se guardan");
+        }
+        QSettings().remove("karaoke/singers");
+        QSettings().remove("karaoke/autoPlay");
+        a.pause(); b.pause();
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

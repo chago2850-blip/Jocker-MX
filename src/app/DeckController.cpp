@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Santiago Miguel y colaboradores de Jocker-MX
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "DeckController.h"
+#include <QDir>
+#include <QFileInfo>
 
 #include "analysis/Analyzer.h"
 #include "analysis/KeyDetector.h"
@@ -129,6 +131,8 @@ void DeckController::load(const QString& pathOrUrl) {
         emit cuesChanged();
         emit loopChanged();
         emit tempoChanged();
+        if (m_deck.keyShift.load() != 0) { m_deck.keyShift.store(0); emit keyLockChanged(); }   // cada pista empieza en su tono
+        loadKaraoke(m_track->path);
         emit trackLoaded(m_track->path, m_track->bpm, m_track->musicalKey);
         updateSections();
         emit stemsChanged();
@@ -154,6 +158,7 @@ void DeckController::eject() {
     m_track.reset();
     if (old || oldStems) QTimer::singleShot(2000, this, [old, oldStems]() {});
     updateSections();
+    loadKaraoke(QString());
     emit stemsChanged();
     emit trackChanged();
 }
@@ -275,6 +280,43 @@ void DeckController::seekSeconds(double sec) {
     m_deck.requestSeek(std::clamp(sec * m_track->sampleRate, 0.0, static_cast<double>(m_track->frames)));
 }
 
+// Busca «cancion.cdg» / «cancion.lrc» junto a «cancion.mp3» (sin importar mayúsculas en la extensión).
+void DeckController::loadKaraoke(const QString& audioPath) {
+    m_cdg = CdgPlayer();
+    m_lyrics = Lyrics();
+    m_lyricsLines.clear();
+    if (!audioPath.isEmpty()) {
+        const QFileInfo fi(audioPath);
+        const QString base = fi.dir().filePath(fi.completeBaseName());
+        for (const char* ext : {".cdg", ".CDG", ".Cdg"})
+            if (QFileInfo::exists(base + ext)) { m_cdg.load(base + ext); break; }
+        for (const char* ext : {".lrc", ".LRC", ".Lrc"})
+            if (QFileInfo::exists(base + ext)) { m_lyrics.load(base + ext); break; }
+        for (const LrcLine& l : m_lyrics.lines()) m_lyricsLines << l.text;
+    }
+    m_lyricLine = -1;
+    m_lyricProgress = 0;
+    emit karaokeChanged();
+    emit lyricChanged();
+}
+
+const QImage& DeckController::cdgFrame() {
+    static const QImage empty;
+    if (!m_cdg.isLoaded() || !m_track) return empty;
+    return m_cdg.frameAt(m_deck.position.load() / m_track->sampleRate);
+}
+
+void DeckController::updateLyric(double s) {
+    if (m_lyrics.isEmpty()) return;
+    const int line = m_lyrics.lineAt(s);
+    const double prog = m_lyrics.progressAt(s, line);
+    if (line != m_lyricLine || std::abs(prog - m_lyricProgress) > 0.004) {
+        m_lyricLine = line;
+        m_lyricProgress = prog;
+        emit lyricChanged();
+    }
+}
+
 void DeckController::updateSections() {
     m_sections = m_track ? analyzeStructure(*m_track) : std::vector<Section>{};
     m_sectionsVar.clear();
@@ -369,6 +411,13 @@ void DeckController::setPitchRange(double r) {
     m_range = r;
     m_pitch = std::clamp(abs / m_range, -1.0, 1.0);
     applyPitch();
+}
+
+void DeckController::setKeyShift(int s) {
+    s = std::clamp(s, -6, 6);
+    if (s == m_deck.keyShift.load()) return;
+    m_deck.keyShift.store(s);
+    emit keyLockChanged();
 }
 
 void DeckController::setKeyLock(bool on) {
@@ -600,6 +649,7 @@ void DeckController::tick() {
     if (pos != m_lastPos) {
         m_lastPos = pos;
         emit positionChanged();
+        if (m_track) updateLyric(pos / m_track->sampleRate);
         if (m_track && !m_sections.empty()) {
             const double s = pos / m_track->sampleRate;
             int idx = -1;

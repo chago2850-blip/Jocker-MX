@@ -30,6 +30,7 @@ public:
     std::atomic<double> pitch{0.0};          // fracción: 0.08 = +8 %
     std::atomic<double> nudge{0.0};          // empujón temporal (±)
     std::atomic<bool>   keyLock{false};
+    std::atomic<int>    keyShift{0};         // semitonos (karaoke): -6..+6
     std::atomic<bool>   scratchActive{false};
     std::atomic<double> scratchRate{0.0};    // velocidad de plato durante scratch (puede ser negativa)
 
@@ -65,6 +66,7 @@ private:
     double m_rate = 0.0;
     bool m_wasStretching = false;
     std::unique_ptr<RubberBand::RubberBandStretcher> m_rb;
+    double m_lastPitchScale = 1.0;
     std::vector<float> m_inL, m_inR, m_outL, m_outR;
     int m_maxBlock = 4096;
 

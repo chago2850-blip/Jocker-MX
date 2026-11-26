@@ -44,6 +44,7 @@ Rectangle {
         MenuSeparator { contentItem: Rectangle { implicitHeight: 1; color: Theme.border } }
         JxMenuItem { text: "➕  Agregar a la cola de Automix"; onTriggered: automix.add([root.menuPath]) }
         JxMenuItem { text: "⤒  Automix: reproducir a continuación"; onTriggered: automix.addNext([root.menuPath]) }
+        JxMenuItem { text: "🎤  Agregar a karaoke…"; onTriggered: singerPrompt.askFor(root.menuPath) }
         JxMenu {
             id: addToMenu
             title: "📃  Agregar a lista"
@@ -88,6 +89,12 @@ Rectangle {
             pending = []
             if (id > 0) library.playlistId = id
         }
+    }
+    JxPrompt {
+        id: singerPrompt
+        property string path: ""
+        function askFor(p) { path = p; ask("¿Quién canta?", "", "Agregar") }
+        onAccepted: function(name) { karaoke.addSinger(name, path, 0) }
     }
     JxPrompt {
         id: renamePrompt
@@ -304,7 +311,7 @@ Rectangle {
                             JxButton { width: 30; height: 22; text: "B"; fontSize: 11; accent: Theme.cyan; active: row.onB; onClicked: deckB.load(model.path) }
                             JxButton { width: 26; height: 22; text: "+"; fontSize: 12; accent: Theme.green; onClicked: automix.add([model.path]); onRightClicked: root.openTrackMenu(model.path, index) }
                         }
-                        Text { Layout.fillWidth: true; Layout.preferredWidth: 30; text: model.title; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
+                        Text { Layout.fillWidth: true; Layout.preferredWidth: 30; text: (model.karaoke ? "🎤 " : "") + model.title; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
                         Text { Layout.fillWidth: true; Layout.preferredWidth: 22; text: model.artist; color: Theme.dim; font.pixelSize: 13; elide: Text.ElideRight }
                         Text { Layout.fillWidth: true; Layout.preferredWidth: 18; text: model.album; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }
                         Text { Layout.preferredWidth: 84; text: model.genre; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }

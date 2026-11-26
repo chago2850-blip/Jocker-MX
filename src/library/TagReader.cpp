@@ -252,6 +252,59 @@ void readWav(QFile& f, TrackTags& t) {
     }
 }
 
+// Comentarios Vorbis (mismo formato que FLAC pero dentro de páginas Ogg)
+void parseVorbisComments(const QByteArray& vc, TrackTags& t) {
+    const auto* v = reinterpret_cast<const uchar*>(vc.constData());
+    if (vc.size() < 8) return;
+    int pos = 4 + static_cast<int>(le32(v));
+    if (pos + 4 > vc.size()) return;
+    const uint32_t count = le32(v + pos);
+    pos += 4;
+    for (uint32_t c = 0; c < count && pos + 4 <= vc.size(); ++c) {
+        const uint32_t l = le32(v + pos);
+        pos += 4;
+        if (l > static_cast<uint32_t>(vc.size() - pos)) break;
+        const QString kv = QString::fromUtf8(vc.mid(pos, static_cast<int>(l)));
+        pos += static_cast<int>(l);
+        const int eq = kv.indexOf('=');
+        if (eq > 0) applyField(t, kv.left(eq).toUpper(), kv.mid(eq + 1).trimmed());
+    }
+}
+
+void readOgg(QFile& f, TrackTags& t) {
+    // Reunir la carga útil de las primeras páginas (cabeceras de identificación y comentarios)
+    QByteArray payload;
+    for (int page = 0; page < 64 && payload.size() < (1 << 20); ++page) {
+        const QByteArray h = f.read(27);
+        if (h.size() < 27 || !h.startsWith("OggS")) break;
+        const int nseg = static_cast<uchar>(h[26]);
+        const QByteArray segs = f.read(nseg);
+        int len = 0;
+        for (char c : segs) len += static_cast<uchar>(c);
+        payload += f.read(len);
+        if (payload.indexOf("\x05vorbis") >= 0) break;     // ya pasamos la cabecera de comentarios
+    }
+    uint32_t rate = 0;
+    const int idh = payload.indexOf("\x01vorbis");
+    if (idh >= 0 && idh + 16 <= payload.size())
+        rate = le32(reinterpret_cast<const uchar*>(payload.constData()) + idh + 12);
+    const int ch = payload.indexOf("\x03vorbis");
+    if (ch >= 0) parseVorbisComments(payload.mid(ch + 7), t);
+    // Duración: posición de gránulo de la última página
+    if (rate > 0 && f.size() > 27) {
+        const qint64 tail = std::min<qint64>(f.size(), 65536);
+        f.seek(f.size() - tail);
+        const QByteArray end = f.read(tail);
+        const int last = end.lastIndexOf("OggS");
+        if (last >= 0 && last + 14 <= end.size()) {
+            const auto* g = reinterpret_cast<const uchar*>(end.constData()) + last + 6;
+            uint64_t gran = 0;
+            for (int i = 7; i >= 0; --i) gran = (gran << 8) | g[i];
+            if (gran > 0 && gran < (uint64_t(1) << 50)) t.duration = double(gran) / rate;
+        }
+    }
+}
+
 } // namespace
 
 TrackTags readTags(const QString& path) {
@@ -262,6 +315,7 @@ TrackTags readTags(const QString& path) {
     const QByteArray magic = f.peek(12);
     if (magic.startsWith("fLaC")) readFlac(f, t);
     else if (magic.startsWith("RIFF")) readWav(f, t);
+    else if (magic.startsWith("OggS")) readOgg(f, t);
     else readMp3(f, t);
     if (t.bpm > 0 && (t.bpm < 30 || t.bpm > 300)) t.bpm = 0;
     return t;

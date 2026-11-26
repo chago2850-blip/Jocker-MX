@@ -47,7 +47,7 @@ Rectangle {
                 model: [ { t: "🎵  Toda la música", v: 0 }, { t: "🕘  Historial", v: 1 }, { t: "🔥  Más tocadas", v: 2 }, { t: "✨  Agregadas", v: 3 } ]
                 Rectangle {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 30
+                    Layout.preferredHeight: 26
                     radius: 6
                     color: library.view === modelData.v ? Qt.rgba(0.96, 0.73, 0.26, 0.15) : (ma.containsMouse ? Theme.panel2 : "transparent")
                     border.color: library.view === modelData.v ? Theme.gold : "transparent"
@@ -66,6 +66,12 @@ Rectangle {
                 Layout.fillWidth: true
                 text: library.scanning ? ("Escaneando… " + library.scanned) : (library.totalCount + " pistas")
                 color: library.scanning ? Theme.gold : Theme.dim; font.pixelSize: 11
+            }
+            JxButton {
+                Layout.fillWidth: true
+                text: library.analyzing ? ("Analizando " + library.analyzedCount + " / " + library.analysisTotal + "  ✕") : "⚡  Analizar todo"
+                accent: Theme.cyan; active: library.analyzing; fontSize: 11
+                onClicked: library.analyzing ? library.cancelAnalysis() : library.analyzeAll()
             }
         }
 
@@ -172,7 +178,11 @@ Rectangle {
                         Text { Layout.fillWidth: true; Layout.preferredWidth: 18; text: model.album; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }
                         Text { Layout.preferredWidth: 84; text: model.genre; color: Theme.faint; font.pixelSize: 12; elide: Text.ElideRight }
                         Text { Layout.preferredWidth: 50; horizontalAlignment: Text.AlignRight; text: model.bpm > 0 ? model.bpm.toFixed(1) : "—"; color: model.bpm > 0 ? Theme.gold : Theme.faint; font.pixelSize: 13 }
-                        Text { Layout.preferredWidth: 40; text: model.musicalKey; color: Theme.cyan; font.pixelSize: 12 }
+                        Text { Layout.preferredWidth: 40; text: model.musicalKey; font.pixelSize: 12
+                               font.weight: compat ? Font.Bold : Font.Normal
+                               readonly property bool compat: model.musicalKey.length > 0 &&
+                                   ((deckA.playing && deckA.keyCompatibleWith(model.musicalKey)) || (deckB.playing && deckB.keyCompatibleWith(model.musicalKey)))
+                               color: compat ? Theme.green : Theme.cyan }
                         Text { Layout.preferredWidth: 50; horizontalAlignment: Text.AlignRight; text: root.fmtDur(model.duration); color: Theme.dim; font.pixelSize: 12 }
                         Text { Layout.preferredWidth: library.view === 1 ? 80 : 46; horizontalAlignment: Text.AlignRight
                                text: library.view === 1 ? root.fmtWhen(model.lastPlayed) : (model.plays > 0 ? model.plays : "")
@@ -186,7 +196,7 @@ Rectangle {
                     text: library.filter.length ? ("Sin resultados para «" + library.filter + "»")
                           : (library.view === 1 ? "Aún no has tocado nada en esta sesión."
                           : (library.view === 2 ? "Aquí aparecerán tus pistas más tocadas."
-                          : "No hay música en esta carpeta.\nPulsa «Carpeta…» para elegir dónde está tu música (MP3, WAV, FLAC)."))
+                          : "No hay música en esta carpeta.\nPulsa «Carpeta…» para elegir dónde está tu música (MP3, WAV, FLAC, OGG)."))
                     color: Theme.faint; font.pixelSize: 13
                 }
             }

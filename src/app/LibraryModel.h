@@ -26,6 +26,9 @@ class LibraryModel : public QAbstractListModel {
     Q_PROPERTY(int count READ rowCountQml NOTIFY countsChanged)
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
     Q_PROPERTY(int scanned READ scanned NOTIFY scanProgress)
+    Q_PROPERTY(bool analyzing READ analyzing NOTIFY analysisChanged)
+    Q_PROPERTY(int analyzedCount READ analyzedCount NOTIFY analysisChanged)
+    Q_PROPERTY(int analysisTotal READ analysisTotal NOTIFY analysisChanged)
 
 public:
     enum Roles {
@@ -51,14 +54,19 @@ public:
     int rowCountQml() const { return static_cast<int>(m_rows.size()); }
     bool scanning() const { return m_scanning; }
     int scanned() const { return m_scannedCount.load(); }
+    bool analyzing() const { return m_analyzing; }
+    int analyzedCount() const { return m_analyzedCount.load(); }
+    int analysisTotal() const { return m_analysisTotal; }
 
     Q_INVOKABLE QString pathAt(int row) const;
     Q_INVOKABLE void rescan();
     Q_INVOKABLE void sortBy(const QString& key);
     Q_INVOKABLE void refresh();
+    Q_INVOKABLE void analyzeAll();       // analiza BPM, tonalidad y duración de las pistas pendientes
+    Q_INVOKABLE void cancelAnalysis() { m_cancelAnalysis = true; }
 
 public slots:
-    void setBpm(const QString& path, double bpm);
+    void setAnalysis(const QString& path, double bpm, const QString& key);
     void onPlayed(const QString& path);
 
 signals:
@@ -69,6 +77,7 @@ signals:
     void countsChanged();
     void scanningChanged();
     void scanProgress();
+    void analysisChanged();
 
 private:
     QString m_folder, m_filter;
@@ -81,6 +90,11 @@ private:
     std::atomic<int> m_scannedCount{0};
     QFutureWatcher<void> m_watcher;
     QTimer m_filterDebounce, m_progressTimer;
+    QFutureWatcher<void> m_analysisWatcher;
+    bool m_analyzing = false;
+    std::atomic<int> m_analyzedCount{0};
+    int m_analysisTotal = 0;
+    std::atomic<bool> m_cancelAnalysis{false};
 };
 
 } // namespace jx

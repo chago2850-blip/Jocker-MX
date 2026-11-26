@@ -57,6 +57,20 @@ Rectangle {
                     elide: Text.ElideRight
                 }
             }
+            Rectangle {     // tonalidad (Camelot), verde si combina con el otro deck
+                visible: root.deck.musicalKey.length > 0
+                readonly property var other: root.deck.index === 0 ? deckB : deckA
+                readonly property bool compatible: other.loaded && other.keyCompatibleWith(root.deck.musicalKey)
+                width: keyTxt.implicitWidth + 16; height: 38; radius: 8
+                color: compatible ? Qt.rgba(0.33, 0.88, 0.54, 0.15) : Theme.panel2
+                border.color: compatible ? Theme.green : Theme.border
+                Column {
+                    anchors.centerIn: parent
+                    Text { id: keyTxt; anchors.horizontalCenter: parent.horizontalCenter; text: root.deck.musicalKey
+                           color: parent.parent.compatible ? Theme.green : Theme.cyan; font.pixelSize: 15; font.weight: Font.Black }
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: root.deck.keyName; color: Theme.dim; font.pixelSize: 9 }
+                }
+            }
             ColumnLayout {
                 spacing: 0
                 Text {
@@ -224,6 +238,34 @@ Rectangle {
             JxButton { Layout.preferredWidth: 34; Layout.preferredHeight: 28; text: "×2"; bold: false; onClicked: root.deck.loopDouble() }
             JxButton { Layout.preferredWidth: 30; Layout.preferredHeight: 28; text: "◀"; bold: false; onClicked: root.deck.beatJump(-4) }
             JxButton { Layout.preferredWidth: 30; Layout.preferredHeight: 28; text: "▶"; bold: false; onClicked: root.deck.beatJump(4) }
+        }
+
+        // ---------- Efectos sincronizados al beat
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Text { text: "FX"; color: Theme.faint; font.pixelSize: 9; font.weight: Font.Bold; font.letterSpacing: 1; Layout.preferredWidth: 46 }
+            Repeater {
+                model: 6
+                JxButton {
+                    Layout.fillWidth: true; Layout.preferredHeight: 28
+                    text: root.deck.fxNames[index + 1]
+                    fontSize: 10
+                    accent: Theme.orange
+                    active: root.deck.fxType === index + 1
+                    onClicked: root.deck.toggleFx(index + 1)
+                }
+            }
+            JxButton {
+                Layout.preferredWidth: 44; Layout.preferredHeight: 28
+                readonly property var steps: [0.25, 0.5, 1, 2, 4, 8]
+                text: root.deck.fxBeats < 1 ? (root.deck.fxBeats === 0.25 ? "¼" : "½") : root.deck.fxBeats
+                accent: Theme.orange; bold: true
+                onClicked: { var i = steps.indexOf(root.deck.fxBeats); root.deck.fxBeats = steps[(i + 1) % steps.length] }
+                onRightClicked: { var i = steps.indexOf(root.deck.fxBeats); root.deck.fxBeats = steps[(i + steps.length - 1) % steps.length] }
+            }
+            Knob { size: 28; from: 0; to: 1; defaultValue: 0.5; bipolar: false; accent: Theme.orange
+                   value: root.deck.fxWet; onMoved: function(v) { root.deck.fxWet = v } }
         }
     }
 }

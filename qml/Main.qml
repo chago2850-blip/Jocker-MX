@@ -7,9 +7,9 @@ import JockerMX
 ApplicationWindow {
     id: win
     width: 1480
-    height: 940
+    height: 980
     minimumWidth: 1180
-    minimumHeight: 820
+    minimumHeight: 860
     visible: true
     title: "Jocker-MX"
     color: Theme.bg
@@ -106,9 +106,9 @@ ApplicationWindow {
         // Decks + mezclador
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 452
-            Layout.maximumHeight: 452
-            Layout.minimumHeight: 452
+            Layout.preferredHeight: 490
+            Layout.maximumHeight: 490
+            Layout.minimumHeight: 490
             Layout.margins: 10
             spacing: 10
             DeckPanel { deck: deckA; Layout.fillWidth: true; Layout.fillHeight: true }

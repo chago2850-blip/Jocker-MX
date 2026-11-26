@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Analyzer.h"
 
+#include "KeyDetector.h"
 #include "library/TagReader.h"
 #include "miniaudio.h"
 
@@ -48,7 +49,7 @@ std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QS
     if (!tags.artist.isEmpty()) t->artist = tags.artist;
     t->album = tags.album;
     t->genre = tags.genre;
-    t->musicalKey = tags.key;
+    t->musicalKey = normalizeKeyToCamelot(tags.key);
 
     ma_uint64 total = 0;
     if (ma_decoder_get_length_in_pcm_frames(&dec, &total) == MA_SUCCESS && total > 0)
@@ -72,6 +73,7 @@ std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QS
     const BeatInfo bi = detectBeats(t->pcm.data(), t->frames, sampleRate);
     t->bpm = bi.bpm;
     t->firstBeat = bi.firstBeat;
+    if (t->musicalKey.isEmpty()) t->musicalKey = detectKey(t->pcm.data(), t->frames, sampleRate).camelot();
     return t;
 }
 

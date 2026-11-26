@@ -36,7 +36,7 @@ const char* kSchema[] = {
 
 QString hotToText(const QVector<double>& h) {
     QStringList l;
-    for (double v : h) l << QString::number(v, 'f', 1);
+    for (double v : h) l << QString::number(v, 'f', 4);
     return l.join(',');
 }
 QVector<double> textToHot(const QString& s) {
@@ -262,6 +262,17 @@ int LibraryDb::count(const QString& folderPrefix) {
     return q.exec() && q.next() ? q.value(0).toInt() : 0;
 }
 
+QStringList LibraryDb::pathsNeedingAnalysis(const QString& folderPrefix) {
+    QStringList out;
+    QSqlQuery q(db());
+    q.prepare("SELECT path FROM tracks WHERE path LIKE ? ESCAPE '\\' AND bpm = 0 AND grid_locked = 0 ORDER BY artist, title");
+    QString pre = folderPrefix;
+    pre.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    q.addBindValue(pre + "%");
+    if (q.exec()) while (q.next()) out << q.value(0).toString();
+    return out;
+}
+
 void LibraryDb::ensureTrack(QSqlDatabase& d, const QString& path) {
     QSqlQuery q(d);
     q.prepare("INSERT OR IGNORE INTO tracks(path, folder, format, added) VALUES(?,?,?,?)");
@@ -289,7 +300,8 @@ TrackState LibraryDb::state(const QString& path) {
     return s;
 }
 
-void LibraryDb::saveAnalysis(const QString& path, double bpm, double firstBeat, double duration, const TrackTags& tags) {
+void LibraryDb::saveAnalysis(const QString& path, double bpm, double firstBeat, double duration, const TrackTags& tags,
+                             const QString& camelotKey) {
     QSqlDatabase d = db();
     ensureTrack(d, path);
     QSqlQuery q(d);
@@ -297,13 +309,15 @@ void LibraryDb::saveAnalysis(const QString& path, double bpm, double firstBeat, 
               " bpm = CASE WHEN grid_locked = 1 THEN bpm ELSE ? END,"
               " first_beat = CASE WHEN grid_locked = 1 THEN first_beat ELSE ? END,"
               " title = CASE WHEN IFNULL(title,'') = '' THEN ? ELSE title END,"
-              " artist = CASE WHEN IFNULL(artist,'') = '' THEN ? ELSE artist END"
+              " artist = CASE WHEN IFNULL(artist,'') = '' THEN ? ELSE artist END,"
+              " musical_key = CASE WHEN IFNULL(musical_key,'') = '' THEN ? ELSE musical_key END"
               " WHERE path = ?");
     q.addBindValue(duration);
     q.addBindValue(bpm);
     q.addBindValue(firstBeat);
     q.addBindValue(tags.title);
     q.addBindValue(tags.artist);
+    q.addBindValue(camelotKey);
     q.addBindValue(path);
     q.exec();
 }
@@ -323,7 +337,7 @@ void LibraryDb::saveHotCues(const QString& path, const QVector<double>& hot) {
     ensureTrack(d, path);
     QSqlQuery q(d);
     q.prepare("UPDATE tracks SET hotcues = ? WHERE path = ?");
-    q.addBindValue(hotToText(hot));
+    q.addBindValue(hotToText(hot));   // segundos
     q.addBindValue(path);
     q.exec();
 }

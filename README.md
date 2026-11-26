@@ -10,12 +10,12 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.2.0-dev (alfa).** Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, **biblioteca con base de datos** y **controladores MIDI con MIDI learn**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-020-dev).
+> **Estado: 0.3.0-dev (alfa).** Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, **detección de tonalidad (Camelot)**, **6 efectos sincronizados al beat** y **OGG**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-030-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX 0.1.0-dev" width="100%"></p>
 
-## Lo que ya funciona en 0.2.0-dev
-- **2 decks** con carga de **MP3, WAV y FLAC** (arrastrar y soltar o botones A/B del navegador).
+## Lo que ya funciona en 0.3.0-dev
+- **2 decks** con carga de **MP3, WAV, FLAC y OGG** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
 - **CUE** estilo CDJ (con vista previa mientras se mantiene), **8 hot cues** que se guardan por pista (clic derecho = borrar), **cuantización**.
@@ -27,7 +27,10 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Biblioteca SQLite**: escaneo incremental de tu carpeta, lectura de etiquetas (ID3 en MP3, Vorbis en FLAC, INFO en WAV), columnas de título, artista, álbum, género, BPM, tonalidad, duración y veces tocada; vistas **Historial**, **Más tocadas** y **Agregadas**.
 - **Búsqueda** sin acentos ni mayúsculas («cancion» encuentra «Canción») y filtros `bpm:120-128` y `key:8A`.
 - **Beatgrid editable**: ½, ×2, TAP, mover la rejilla ±10 ms y «beat aquí»; se guarda por pista junto con cue y hot cues.
-- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 39 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
+- **Tonalidad automática** con notación **Camelot** (y Open Key): se muestra en cada deck y en la biblioteca, en **verde** cuando combina armónicamente con lo que está sonando.
+- **Efectos por deck sincronizados al beat**: eco, reverb, flanger, phaser, crush (bitcrusher) y gate, con duración de ¼ a 8 beats y perilla de cantidad.
+- **Analizar todo**: calcula BPM, tonalidad y duración de toda la biblioteca en segundo plano.
+- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 46 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
 - Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader.
 
 ### Instalar

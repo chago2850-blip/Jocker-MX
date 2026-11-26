@@ -9,6 +9,7 @@
 #include <QSet>
 #include <QSqlDatabase>
 #include <QString>
+#include <QStringList>
 #include <QVector>
 
 namespace jx {
@@ -51,11 +52,12 @@ public:
     static QList<TrackRow> query(View view, const QString& folderPrefix, const QString& filter,
                                  const QString& sortKey, bool ascending, int limit = 20000);
     static int count(const QString& folderPrefix);
+    static QStringList pathsNeedingAnalysis(const QString& folderPrefix);
 
     // Estado por pista
     static TrackState state(const QString& path);
     static void saveAnalysis(const QString& path, double bpm, double firstBeat, double duration,
-                             const TrackTags& tags);
+                             const TrackTags& tags, const QString& camelotKey = QString());
     static void saveCue(const QString& path, double cue);
     static void saveHotCues(const QString& path, const QVector<double>& hot);
     static void saveGrid(const QString& path, double bpm, double firstBeat);

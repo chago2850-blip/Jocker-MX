@@ -3,6 +3,7 @@
 #include "LibraryModel.h"
 
 #include "analysis/Analyzer.h"
+#include "analysis/KeyDetector.h"
 #include "library/TagReader.h"
 
 #include <QDirIterator>
@@ -28,7 +29,13 @@ LibraryModel::LibraryModel(QObject* parent) : QAbstractListModel(parent) {
     m_filterDebounce.setInterval(120);
     connect(&m_filterDebounce, &QTimer::timeout, this, &LibraryModel::refresh);
     m_progressTimer.setInterval(250);
-    connect(&m_progressTimer, &QTimer::timeout, this, [this]() { emit scanProgress(); });
+    connect(&m_progressTimer, &QTimer::timeout, this, [this]() { emit scanProgress(); emit analysisChanged(); });
+    connect(&m_analysisWatcher, &QFutureWatcherBase::finished, this, [this]() {
+        m_analyzing = false;
+        if (!m_scanning) m_progressTimer.stop();
+        emit analysisChanged();
+        refresh();
+    });
 
     QSettings s;
     QString f = s.value("library/folder").toString();
@@ -134,7 +141,7 @@ void LibraryModel::rescan() {
     m_watcher.setFuture(QtConcurrent::run([root, counter, self]() {
         const QString prefix = root + '/';
         const QHash<QString, qint64> known = LibraryDb::knownMtimes(prefix);
-        static const QStringList exts = {"*.mp3", "*.wav", "*.flac", "*.wave", "*.MP3", "*.WAV", "*.FLAC"};
+        static const QStringList exts = {"*.mp3", "*.wav", "*.flac", "*.wave", "*.ogg", "*.oga", "*.MP3", "*.WAV", "*.FLAC", "*.OGG"};
         QDirIterator it(root, exts, QDir::Files, QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
         QSet<QString> present;
         QList<ScanEntry> batch;
@@ -151,6 +158,8 @@ void LibraryModel::rescan() {
             e.size = fi.size();
             e.mtime = mtime;
             e.tags = readTags(p);
+            const QString cam = normalizeKeyToCamelot(e.tags.key);
+            if (!cam.isEmpty()) e.tags.key = cam;
             batch << e;
             if (batch.size() >= 250) {
                 LibraryDb::upsertScanned(batch);
@@ -168,12 +177,47 @@ QString LibraryModel::pathAt(int row) const {
     return (row >= 0 && row < m_rows.size()) ? m_rows[row].path : QString();
 }
 
-void LibraryModel::setBpm(const QString& path, double bpm) {
+void LibraryModel::setAnalysis(const QString& path, double bpm, const QString& key) {
     for (int r = 0; r < m_rows.size(); ++r) {
         if (m_rows[r].path != path) continue;
         m_rows[r].bpm = bpm;
-        emit dataChanged(index(r), index(r), {BpmRole});
+        if (m_rows[r].key.isEmpty()) m_rows[r].key = key;
+        emit dataChanged(index(r), index(r), {BpmRole, KeyRole});
     }
+}
+
+void LibraryModel::analyzeAll() {
+    if (m_analyzing || m_folder.isEmpty()) return;
+    const QStringList paths = LibraryDb::pathsNeedingAnalysis(m_folder + '/');
+    if (paths.isEmpty()) return;
+    m_analyzing = true;
+    m_cancelAnalysis = false;
+    m_analyzedCount = 0;
+    m_analysisTotal = static_cast<int>(paths.size());
+    emit analysisChanged();
+    m_progressTimer.start();
+    std::atomic<int>* done = &m_analyzedCount;
+    std::atomic<bool>* cancel = &m_cancelAnalysis;
+    QPointer<LibraryModel> self(this);
+    // Un solo hilo de fondo: no compite con el audio mientras se mezcla
+    m_analysisWatcher.setFuture(QtConcurrent::run([paths, done, cancel, self]() {
+        int sinceRefresh = 0;
+        for (const QString& p : paths) {
+            if (cancel->load()) break;
+            QString err;
+            auto t = loadAndAnalyze(p, 44100.0, &err);
+            if (t) {
+                TrackTags tg;
+                tg.title = t->title;
+                tg.artist = t->artist;
+                LibraryDb::saveAnalysis(p, t->bpm, t->firstBeat / t->sampleRate, t->durationSec(), tg, t->musicalKey);
+            } else {
+                LibraryDb::saveAnalysis(p, -1, -1, 0, TrackTags());      // marcar como no analizable
+            }
+            done->fetch_add(1);
+            if (++sinceRefresh % 10 == 0 && self) QMetaObject::invokeMethod(self.data(), "refresh", Qt::QueuedConnection);
+        }
+    }));
 }
 
 void LibraryModel::onPlayed(const QString& path) {

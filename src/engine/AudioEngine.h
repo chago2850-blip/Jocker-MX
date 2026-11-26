@@ -4,6 +4,7 @@
 
 #include "Biquad.h"
 #include "Deck.h"
+#include "Effects.h"
 
 #include <QString>
 #include <atomic>
@@ -40,6 +41,7 @@ public:
     int numDecks() const { return static_cast<int>(m_decks.size()); }
     Deck& deck(int i) { return *m_decks[i]; }
     ChannelParams& channel(int i) { return *m_channels[i]; }
+    EffectUnit& effects(int i) { return *m_fx[i]; }
 
     double sampleRate() const { return m_sr; }
     int outputChannels() const { return m_outCh; }
@@ -69,6 +71,7 @@ private:
 
     std::vector<std::unique_ptr<Deck>> m_decks;
     std::vector<std::unique_ptr<ChannelParams>> m_channels;
+    std::vector<std::unique_ptr<EffectUnit>> m_fx;
     std::vector<ChannelDsp> m_dsp;
     std::vector<std::vector<float>> m_deckBuf;
     std::vector<float> m_master, m_cue;

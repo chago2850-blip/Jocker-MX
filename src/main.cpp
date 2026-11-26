@@ -18,7 +18,7 @@
 #include <QTimer>
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.2.0-dev"
+#define JOCKER_VERSION "0.3.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -64,8 +64,8 @@ int main(int argc, char* argv[]) {
     jx::LibraryModel library;
     jx::MidiManager midi({&deckA, &deckB}, &mixer);
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
-    QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setBpm);
-    QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setBpm);
+    QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
+    QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
     QObject::connect(&deckA, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
     QObject::connect(&deckB, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
 

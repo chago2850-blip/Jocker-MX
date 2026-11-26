@@ -39,6 +39,8 @@ const ActionDef kDeckActions[] = {
     {"loop1", "Loop 1 beat"}, {"loop2", "Loop 2 beats"}, {"loop4", "Loop 4 beats"}, {"loop8", "Loop 8 beats"},
     {"loophalve", "Loop ÷2"}, {"loopdouble", "Loop ×2"}, {"loopexit", "Salir del loop"},
     {"jumpback", "Saltar 4 beats atrás"}, {"jumpfwd", "Saltar 4 beats adelante"},
+    {"fx1", "Efecto: eco"}, {"fx2", "Efecto: reverb"}, {"fx3", "Efecto: flanger"}, {"fx4", "Efecto: phaser"},
+    {"fx5", "Efecto: crush"}, {"fx6", "Efecto: gate"}, {"fxwet", "Cantidad del efecto"},
 };
 const ActionDef kGlobalActions[] = {
     {"xfader", "Crossfader"}, {"master", "Volumen master"}, {"cuemix", "Mezcla cue / master"},
@@ -238,6 +240,7 @@ void MidiManager::dispatch(const QString& action, int type, int value, int value
     if (a == "eqlow") { d->setEqLow(centered(v)); return; }
     if (a == "filter") { d->setFilter(centered(v)); return; }
     if (a == "pitch") { d->setSyncLock(false); d->setPitch(centered(v)); return; }
+    if (a == "fxwet") { d->setFxWet(v); return; }
 
     // Botones
     if (a == "cue") { pressed ? d->cueDown() : d->cueUp(); return; }
@@ -257,6 +260,7 @@ void MidiManager::dispatch(const QString& action, int type, int value, int value
     else if (a == "loopexit") d->loopExit();
     else if (a == "jumpback") d->beatJump(-4);
     else if (a == "jumpfwd") d->beatJump(4);
+    else if (a.startsWith("fx") && a.mid(2).toInt() > 0) d->toggleFx(a.mid(2).toInt());
 }
 
 void MidiManager::jogTick() {

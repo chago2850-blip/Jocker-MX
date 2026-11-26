@@ -1,8 +1,8 @@
-# 06 · Manual de usuario — Jocker-MX 0.2.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.3.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
-2. Pulsa **📁 Carpeta** (abajo) y elige dónde está tu música. Se aceptan **MP3, WAV y FLAC**.
+2. Pulsa **📁 Carpeta** (abajo) y elige dónde está tu música. Se aceptan **MP3, WAV, FLAC y OGG**.
 3. Carga una pista con los botones **A** o **B** de cada fila, con **doble clic** (va al deck libre) o **arrastrándola** sobre un deck. También puedes arrastrar archivos desde el explorador de tu sistema.
 4. Al cargar, la pista se **analiza** (BPM, beatgrid y forma de onda). El BPM queda guardado y aparece en el navegador.
 
@@ -25,6 +25,21 @@
 
 Las **formas de onda grandes** (arriba) muestran graves en magenta, medios en oro y agudos en cian, con líneas de beat (más brillantes cada compás), cues y loops. Arrástralas para hacer scratch fino; la rueda del ratón cambia el zoom.
 
+### Tonalidad y mezcla armónica
+Junto al BPM aparece la **tonalidad** en notación Camelot (por ejemplo **8A** = La menor). Si una pista ya trae la tonalidad en sus etiquetas («Am», «F#m», «1m», «8A»…), se usa esa; si no, Jocker-MX la detecta al analizarla. El recuadro se pone **verde** cuando combina con la pista del otro deck: misma clave, ±1 en la rueda (8A ↔ 7A/9A) o su relativa (8A ↔ 8B). En la biblioteca, la columna TONO se pone en verde para las pistas que combinan con lo que está sonando.
+
+### Efectos (FX)
+Cada deck tiene una fila **FX** con seis efectos, todos sincronizados al beat de la pista:
+| Efecto | Qué hace | El botón de beats controla |
+|---|---|---|
+| **ECO** | Repite el sonido; al apagarlo (o pausar) la cola se desvanece | El tiempo entre repeticiones |
+| **REVERB** | Sala/espacio | — (la perilla controla tamaño y mezcla) |
+| **FLANGER** | Barrido metálico tipo «avión» | La duración del barrido |
+| **PHASER** | Barrido suave de fase | La duración del barrido |
+| **CRUSH** | Reduce bits y frecuencia (sonido «retro») | — |
+| **GATE** | Corta el sonido en ritmo (trance gate) | El tamaño de cada corte |
+Clic en un efecto lo enciende (otro clic lo apaga). El botón numérico cambia la duración (¼, ½, 1, 2, 4, 8 beats; clic derecho para bajar) y la perilla naranja la **cantidad**.
+
 ## 3. El mezclador
 - **GAIN**: ganancia de entrada (±12 dB).
 - **HIGH / MID / LOW**: ecualizador. Al fondo a la izquierda la banda se **elimina por completo** (*kill*, la perilla se pone roja).
@@ -40,6 +55,7 @@ Las **formas de onda grandes** (arriba) muestran graves en magenta, medios en or
 - **Vistas** (barra izquierda): *Toda la música*, *Historial* (lo que has tocado, con fecha y hora), *Más tocadas* y *Agregadas* recientemente.
 - **Ordenar**: clic en el encabezado de una columna; otro clic invierte el orden.
 - **Buscar**: escribe palabras de título, artista, álbum o género; no importan acentos ni mayúsculas. Filtros especiales: `bpm:120-128` (rango de tempo), `bpm:124` y `key:8A`.
+- **⚡ Analizar todo** calcula en segundo plano el BPM, la tonalidad y la duración de las pistas que aún no se han analizado (puedes seguir mezclando; pulsa otra vez para detenerlo).
 - El BPM, el beatgrid, el cue y los hot cues de cada pista se guardan en la biblioteca (`biblioteca.sqlite` en la carpeta de datos de la app).
 
 ### Corregir el beatgrid
@@ -65,8 +81,8 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 
 ## 7. Solución de problemas
 - **"Sin dispositivo de audio"**: el sistema no encontró tarjeta de sonido; la interfaz funciona pero en silencio. Conecta una salida de audio y reinicia la app.
-- **Una pista no carga**: en esta versión sólo se leen MP3, WAV y FLAC. Otros formatos (AAC/M4A, OGG, video) llegarán con el decodificador FFmpeg.
+- **Una pista no carga**: en esta versión se leen MP3, WAV, FLAC y OGG. AAC/M4A y video llegarán con el decodificador FFmpeg.
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 8. Próximamente
-Efectos, sampler, stems con IA, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Sampler, más efectos, stems con IA, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

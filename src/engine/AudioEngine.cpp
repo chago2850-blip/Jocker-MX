@@ -33,6 +33,7 @@ AudioEngine::AudioEngine(int numDecks) {
     for (int i = 0; i < numDecks; ++i) {
         m_decks.push_back(std::make_unique<Deck>(i));
         m_channels.push_back(std::make_unique<ChannelParams>());
+        m_fx.push_back(std::make_unique<EffectUnit>());
     }
     m_dsp.resize(numDecks);
     m_deckBuf.assign(numDecks, std::vector<float>(kMaxBlock * 2, 0.f));
@@ -83,6 +84,7 @@ bool AudioEngine::start() {
     m_deviceName = QString::fromUtf8(m_dev->playback.name);
     m_backend = QString::fromUtf8(ma_get_backend_name(m_ctx->backend));
     for (auto& d : m_decks) d->prepare(m_sr, kMaxBlock);
+    for (auto& f : m_fx) f->prepare(m_sr);
 
     if (ma_device_start(m_dev) != MA_SUCCESS) {
         qWarning() << "No se pudo iniciar el dispositivo de audio";
@@ -98,6 +100,7 @@ void AudioEngine::prepareOffline(double sampleRate) {
     m_outCh = 2;
     m_null = true;
     for (auto& d : m_decks) d->prepare(m_sr, kMaxBlock);
+    for (auto& f : m_fx) f->prepare(m_sr);
 }
 
 void AudioEngine::stop() {
@@ -149,6 +152,15 @@ void AudioEngine::render(float* out, int n) {
         ChannelDsp& dsp = m_dsp[d];
         updateDsp(dsp, p);
 
+        // Posición musical del deck para sincronizar los efectos
+        double beatPos = 0, beatSamples = 0;
+        if (const Track* tr = m_decks[d]->track(); tr && tr->bpm > 0) {
+            const double bl = tr->sampleRate * 60.0 / tr->bpm;
+            const double rate = std::max(0.05, m_decks[d]->baseRate());
+            beatPos = (m_decks[d]->position.load(std::memory_order_relaxed) - tr->firstBeat) / bl;
+            beatSamples = bl / rate;
+        }
+
         const float targetGain = std::pow(10.f, p.gainDb.load(std::memory_order_relaxed) / 20.f);
         const float fader = p.fader.load(std::memory_order_relaxed);
         const float xg = numDecks() >= 2 ? (d % 2 == 0 ? xA : xB) : 1.f;
@@ -160,15 +172,25 @@ void AudioEngine::render(float* out, int n) {
         float peak = 0.f;
         const float gStep = (targetGain - dsp.curGain) / n;
         const float fStep = (targetFader - dsp.curFader) / n;
+        // 1) Gain + EQ + filtro (en sitio)
         for (int i = 0; i < n; ++i) {
             dsp.curGain += gStep;
-            dsp.curFader += fStep;
             for (int c = 0; c < 2; ++c) {
                 float s = buf[2 * i + c] * dsp.curGain;
                 s = dsp.low.process(s, c);
                 s = dsp.mid.process(s, c);
                 s = dsp.high.process(s, c);
                 if (filtOn) s = dsp.filt.process(s, c);
+                buf[2 * i + c] = s;
+            }
+        }
+        // 2) Efectos sincronizados al beat (pre-fader)
+        m_fx[d]->process(buf, n, beatPos, beatSamples);
+        // 3) Audífonos, fader y suma al master
+        for (int i = 0; i < n; ++i) {
+            dsp.curFader += fStep;
+            for (int c = 0; c < 2; ++c) {
+                const float s = buf[2 * i + c];
                 if (pfl) m_cue[2 * i + c] += s;
                 const float post = s * dsp.curFader;
                 m_master[2 * i + c] += post;

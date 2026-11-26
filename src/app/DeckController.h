@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QElapsedTimer>
+#include <QStringList>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 #include <memory>
@@ -24,6 +25,8 @@ class DeckController : public QObject {
     Q_PROPERTY(bool loading READ loading NOTIFY loadingChanged)
     Q_PROPERTY(QString title READ title NOTIFY trackChanged)
     Q_PROPERTY(QString artist READ artist NOTIFY trackChanged)
+    Q_PROPERTY(QString musicalKey READ musicalKey NOTIFY trackChanged)
+    Q_PROPERTY(QString keyName READ keyName NOTIFY trackChanged)
     Q_PROPERTY(QString filePath READ filePath NOTIFY trackChanged)
     Q_PROPERTY(QString error READ error NOTIFY errorChanged)
     Q_PROPERTY(double duration READ duration NOTIFY trackChanged)
@@ -56,6 +59,11 @@ class DeckController : public QObject {
     Q_PROPERTY(double volume READ volume WRITE setVolume NOTIFY mixerChanged) // 0..1
     Q_PROPERTY(bool pfl READ pfl WRITE setPfl NOTIFY mixerChanged)
     Q_PROPERTY(double level READ level NOTIFY levelChanged)
+    // Efectos
+    Q_PROPERTY(int fxType READ fxType WRITE setFxType NOTIFY fxChanged)
+    Q_PROPERTY(double fxWet READ fxWet WRITE setFxWet NOTIFY fxChanged)
+    Q_PROPERTY(double fxBeats READ fxBeats WRITE setFxBeats NOTIFY fxChanged)
+    Q_PROPERTY(QStringList fxNames READ fxNames CONSTANT)
 
 public:
     DeckController(AudioEngine* engine, int index, QObject* parent = nullptr);
@@ -69,6 +77,9 @@ public:
     bool loading() const { return m_loading; }
     QString title() const;
     QString artist() const;
+    QString musicalKey() const;
+    QString keyName() const;
+    Q_INVOKABLE bool keyCompatibleWith(const QString& camelot) const;
     QString filePath() const;
     QString error() const { return m_error; }
     double duration() const;
@@ -113,6 +124,14 @@ public:
     bool pfl() const { return m_ch.pfl.load(); }
     void setPfl(bool on);
     double level() const { return m_level; }
+    int fxType() const { return m_fx.type.load(); }
+    void setFxType(int t);
+    double fxWet() const { return m_fx.wet.load(); }
+    void setFxWet(double w);
+    double fxBeats() const { return m_fx.beats.load(); }
+    void setFxBeats(double b);
+    QStringList fxNames() const;
+    Q_INVOKABLE void toggleFx(int t) { setFxType(fxType() == t ? 0 : t); }
 
     Q_INVOKABLE void load(const QString& pathOrUrl);
     Q_INVOKABLE void eject();
@@ -157,7 +176,8 @@ signals:
     void quantizeChanged();
     void mixerChanged();
     void levelChanged();
-    void trackLoaded(const QString& path, double bpm);
+    void fxChanged();
+    void trackLoaded(const QString& path, double bpm, const QString& key);
     void played(const QString& path);
 
 private:
@@ -171,6 +191,7 @@ private:
     int m_index;
     Deck& m_deck;
     ChannelParams& m_ch;
+    EffectUnit& m_fx;
     DeckController* m_partner = nullptr;
     std::shared_ptr<Track> m_track;
     bool m_loading = false;

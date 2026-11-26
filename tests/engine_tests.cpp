@@ -4,6 +4,7 @@
 // Pruebas del motor: decodificación, BPM/beatgrid, reproducción, key lock, mezclador y sync.
 // Genera sus propias pistas sintéticas (no requiere archivos externos).
 #include "analysis/Analyzer.h"
+#include "analysis/KeyDetector.h"
 #include "app/DeckController.h"
 #include "app/Mixer.h"
 #include "control/MidiManager.h"
@@ -279,11 +280,11 @@ int main(int argc, char** argv) {
         jx::LibraryDb::addHistory(tmp.filePath("prueba.flac"), 0);
         auto h = jx::LibraryDb::query(jx::LibraryDb::View::History, pre, "", "", true);
         CHECK(h.size() == 3 && h[0].path.endsWith(".flac"), "historial: %lld reproducciones, la más reciente primero", static_cast<long long>(h.size()));
-        QVector<double> hot(8, -1.0); hot[2] = 48000.0;
+        QVector<double> hot(8, -1.0); hot[2] = 12.3456;
         jx::LibraryDb::saveHotCues(tmp.filePath("prueba.flac"), hot);
         jx::LibraryDb::saveCue(tmp.filePath("prueba.flac"), 1234.0);
         const jx::TrackState st = jx::LibraryDb::state(tmp.filePath("prueba.flac"));
-        CHECK(st.found && st.cue == 1234.0 && st.hotCues[2] == 48000.0 && st.hotCues[0] < 0, "cues guardados y restaurados");
+        CHECK(st.found && st.cue == 1234.0 && std::abs(st.hotCues[2] - 12.3456) < 1e-4 && st.hotCues[0] < 0, "cues guardados y restaurados");
         jx::LibraryDb::saveGrid(tmp.filePath("t124.wav"), 62.0, 100.0);
         CHECK(jx::LibraryDb::state(tmp.filePath("t124.wav")).gridLocked, "beatgrid editado queda bloqueado");
         QSet<QString> present = {tmp.filePath("prueba.mp3"), tmp.filePath("prueba.flac")};
@@ -325,6 +326,93 @@ int main(int argc, char** argv) {
         CHECK(midi.saveMapping(tmp.filePath("mapeo.json")), "mapeo guardado en JSON");
         midi.clearAll();
         CHECK(midi.loadMapping(tmp.filePath("mapeo.json")) && midi.bindings().size() == 4, "mapeo recargado (%lld acciones)", static_cast<long long>(midi.bindings().size()));
+    }
+
+    std::printf("\n[9] Tonalidad\n");
+    {
+        // Progresiones con acordes de 3 notas + bajo, 2 s por acorde
+        auto synth = [&](const std::vector<std::vector<int>>& chords, double secs) {
+            const int n = static_cast<int>(secs * sr);
+            std::vector<float> pcm(static_cast<size_t>(n) * 2, 0.f);
+            const int per = static_cast<int>(2.0 * sr);
+            for (int i = 0; i < n; ++i) {
+                const auto& ch = chords[(i / per) % chords.size()];
+                double v = 0;
+                for (size_t k = 0; k < ch.size(); ++k) {
+                    const double f = 440.0 * std::pow(2.0, (ch[k] - 69) / 12.0);
+                    double tone = std::sin(2 * M_PI * f * i / sr) + 0.3 * std::sin(4 * M_PI * f * i / sr);
+                    v += tone * (k == 0 ? 0.5 : 0.25);
+                }
+                pcm[2 * i] = pcm[2 * i + 1] = static_cast<float>(v * 0.3);
+            }
+            return pcm;
+        };
+        struct KCase { const char* name; const char* expect; std::vector<std::vector<int>> chords; };
+        const std::vector<KCase> kc = {
+            {"La menor (Am-F-C-G)", "8A", {{45, 69, 72, 76}, {41, 65, 69, 72}, {48, 67, 72, 76}, {43, 67, 71, 74}, {45, 69, 72, 76}}},
+            {"Do mayor (C-F-G-C)", "8B", {{48, 60, 64, 67}, {41, 65, 69, 72}, {43, 67, 71, 74}, {48, 64, 67, 72}}},
+            {"Mi menor (Em-C-D-Em)", "9A", {{40, 64, 67, 71}, {48, 64, 67, 72}, {50, 66, 69, 74}, {40, 64, 67, 71}, {47, 66, 71, 74}}},
+            {"Sol mayor (G-C-D-G)", "9B", {{43, 67, 71, 74}, {48, 64, 67, 72}, {50, 66, 69, 74}, {43, 67, 71, 74}}},
+            {"Re menor (Dm-Bb-C-A-Dm)", "7A", {{50, 62, 65, 69}, {46, 62, 65, 70}, {48, 64, 67, 72}, {45, 61, 64, 69}, {50, 62, 65, 69}}},
+            {"Mi mayor (E-A-B-E)", "12B", {{40, 64, 68, 71}, {45, 64, 69, 73}, {47, 63, 66, 71}, {40, 64, 68, 71}}},
+            {"Fa♯ menor (F#m-D-E-F#m)", "11A", {{42, 66, 69, 73}, {50, 66, 69, 74}, {52, 64, 68, 71}, {42, 66, 69, 73}}},
+        };
+        for (const KCase& c : kc) {
+            const auto pcm = synth(c.chords, 40);
+            const jx::KeyResult k = jx::detectKey(pcm.data(), static_cast<int64_t>(pcm.size() / 2), sr);
+            CHECK(k.camelot() == c.expect, "%s → %s (%s, confianza %.2f)", c.name, qPrintable(k.camelot()), qPrintable(k.name()), k.confidence);
+        }
+        CHECK(jx::normalizeKeyToCamelot("Am") == "8A" && jx::normalizeKeyToCamelot("F#m") == "11A" &&
+              jx::normalizeKeyToCamelot("Bb") == "6B" && jx::normalizeKeyToCamelot("1m") == "8A" &&
+              jx::normalizeKeyToCamelot("C major") == "8B", "conversión de notaciones (Am, F#m, Bb, Open Key) a Camelot");
+        CHECK(jx::keysCompatible("8A", "9A") && jx::keysCompatible("8A", "8B") && jx::keysCompatible("12B", "1B") &&
+              !jx::keysCompatible("8A", "10A") && !jx::keysCompatible("8A", "9B"), "compatibilidad armónica en la rueda de Camelot");
+        CHECK(jx::keyFromCamelot("8A").openKey() == "1m" && jx::keyFromCamelot("8B").openKey() == "1d", "notación Open Key");
+    }
+
+    std::printf("\n[10] Efectos\n");
+    {
+        b.stop();
+        a.setVolume(1); a.setEqLow(0); a.setEqMid(0); a.setEqHigh(0); a.setFilter(0); a.setGain(0);
+        eng.crossfader.store(0.f);
+        if (!a.playing()) a.playPause();
+        renderSecs(0.5);
+        std::vector<float> dry; renderSecs(1.0, &dry);
+        const double dryRms = rms(dry);
+        for (int t = 1; t < jx::EffectUnit::Count; ++t) {
+            a.setFxType(t); a.setFxWet(0.8); a.setFxBeats(t == jx::EffectUnit::Gate ? 0.5 : 1.0);
+            renderSecs(0.3);
+            std::vector<float> wet; renderSecs(1.0, &wet);
+            bool finite = true; float mx = 0;
+            for (float v : wet) { finite &= std::isfinite(v); mx = std::max(mx, std::abs(v)); }
+            double diff = 0; const size_t m = std::min(wet.size(), dry.size());
+            for (size_t i = 0; i < m; ++i) diff += std::abs(wet[i] - dry[i]);
+            CHECK(finite && mx <= 0.98f && rms(wet) > 0.01 && diff / m > 0.002,
+                  "%s: activo, estable (pico %.2f, RMS %.3f vs %.3f seco)", jx::EffectUnit::name(t), mx, rms(wet), dryRms);
+        }
+        // El eco deja cola al pausar el deck
+        a.setFxType(jx::EffectUnit::Echo); a.setFxWet(0.8); a.setFxBeats(0.5);
+        renderSecs(1.0);
+        a.playPause();   // pausa
+        renderSecs(0.05);
+        std::vector<float> tail; renderSecs(0.4, &tail);
+        CHECK(rms(tail) > 0.005, "eco: la cola sigue sonando tras pausar (RMS %.3f)", rms(tail));
+        a.setFxType(0);
+        renderSecs(0.5);
+        std::vector<float> off; renderSecs(0.3, &off);
+        CHECK(rms(off) < 0.001, "efecto apagado y deck en pausa: silencio");
+    }
+
+    const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");
+    if (!extra.isEmpty()) {
+        std::printf("\n[10] Archivos externos (%s)\n", extra.constData());
+        for (const QFileInfo& fi : QDir(QString::fromLocal8Bit(extra)).entryInfoList(QDir::Files)) {
+            QString err;
+            auto t = jx::loadAndAnalyze(fi.filePath(), sr, &err);
+            const jx::TrackTags tg = jx::readTags(fi.filePath());
+            CHECK(t != nullptr, "%s → %.2f BPM, %s, %.1f s, etiqueta «%s»", qPrintable(fi.fileName()), t ? t->bpm : 0.0,
+                  t ? qPrintable(t->musicalKey) : "-", tg.duration, qPrintable(tg.title));
+        }
     }
 
     std::printf("\nResultado: %d correctas, %d fallidas\n", g_pass, g_fail);

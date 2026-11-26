@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import JockerMX
 
 // Plato virtual. Centro: scratch (como tocar el vinilo). Aro exterior: empujar/frenar (pitch bend).
 Item {

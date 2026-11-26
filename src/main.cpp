@@ -101,6 +101,9 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
                      []() { QCoreApplication::exit(1); }, Qt::QueuedConnection);
+    // El módulo JockerMX (qmldir con el singleton Theme) vive en qrc:/JockerMX;
+    // sin esta ruta solo se encontraba al ejecutar desde el directorio de compilación.
+    qml.addImportPath(QStringLiteral("qrc:/"));
     qml.load(QUrl(QStringLiteral("qrc:/JockerMX/qml/Main.qml")));
     if (qml.rootObjects().isEmpty()) return 1;
 

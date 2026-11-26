@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import JockerMX
 import QtQuick.Layouts
 
 Rectangle {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import JockerMX
 
 // Perilla giratoria. Arrastre vertical para ajustar, doble clic para regresar al valor por defecto.
 Item {

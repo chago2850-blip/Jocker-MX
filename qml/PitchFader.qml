@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import JockerMX
 
 // Fader de pitch vertical (arriba = más lento, como en los platos; centro = 0 %).
 Item {

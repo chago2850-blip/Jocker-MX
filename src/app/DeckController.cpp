@@ -3,23 +3,15 @@
 #include "DeckController.h"
 
 #include "analysis/Analyzer.h"
+#include "library/LibraryDb.h"
 
-#include <QCryptographicHash>
 #include <QFutureWatcher>
-#include <QSettings>
 #include <QTimer>
 #include <QUrl>
 #include <QtConcurrent/QtConcurrentRun>
 #include <cmath>
 
 namespace jx {
-
-namespace {
-QString cueKey(const QString& path) {
-    return QStringLiteral("cues/") +
-           QString::fromLatin1(QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Md5).toHex());
-}
-} // namespace
 
 DeckController::DeckController(AudioEngine* engine, int index, QObject* parent)
     : QObject(parent), m_engine(engine), m_index(index), m_deck(engine->deck(index)),
@@ -95,14 +87,20 @@ void DeckController::load(const QString& pathOrUrl) {
         m_deck.setTrack(m_track.get());
         if (old) QTimer::singleShot(2000, this, [old]() {});
 
-        // Restaurar cues guardados
-        QSettings s;
-        s.beginGroup(cueKey(m_track->path));
-        m_cue = s.value("cue", m_track->firstBeat).toDouble();
-        for (int i = 0; i < 8; ++i) m_hot[i] = s.value(QStringLiteral("hot%1").arg(i), -1.0).toDouble();
-        const double bpmOverride = s.value("bpm", 0.0).toDouble();
-        s.endGroup();
-        if (bpmOverride > 0) m_track->bpm = bpmOverride;
+        // Restaurar estado guardado en la biblioteca (beatgrid editado, cues, hot cues)
+        const TrackState st = LibraryDb::state(m_track->path);
+        if (st.gridLocked && st.bpm > 0) {
+            m_track->bpm = st.bpm;
+            m_track->firstBeat = std::max(0.0, st.firstBeat);
+        } else {
+            TrackTags tg;
+            tg.title = m_track->title;
+            tg.artist = m_track->artist;
+            LibraryDb::saveAnalysis(m_track->path, m_track->bpm, m_track->firstBeat, m_track->durationSec(), tg);
+        }
+        m_cue = st.cue >= 0 ? st.cue : m_track->firstBeat;
+        for (int i = 0; i < 8; ++i) m_hot[i] = st.hotCues.value(i, -1.0);
+        m_historyLogged = false;
         m_deck.requestSeek(m_cue);
         m_loopBeats = 4;
         emit trackChanged();
@@ -134,7 +132,58 @@ void DeckController::playPause() {
     m_cuePreview = false;
     if (m_deck.reachedEnd.load()) { m_deck.reachedEnd.store(false); m_deck.requestSeek(m_cue); }
     m_deck.playing.store(!m_deck.playing.load());
+    if (m_deck.playing.load() && !m_historyLogged) {
+        m_historyLogged = true;
+        LibraryDb::addHistory(m_track->path, m_index);
+        emit played(m_track->path);
+    }
     emit playingChanged();
+}
+
+void DeckController::saveHotCues() {
+    if (!m_track) return;
+    QVector<double> h(8);
+    for (int i = 0; i < 8; ++i) h[i] = m_hot[i];
+    LibraryDb::saveHotCues(m_track->path, h);
+}
+
+// ------------------------------------------------------------------ beatgrid
+void DeckController::setGrid(double bpm, double firstBeat) {
+    if (!m_track || bpm <= 0) return;
+    // La pista es inmutable para el hilo de audio salvo bpm/firstBeat, que sólo lee la UI.
+    m_track->bpm = bpm;
+    m_track->firstBeat = std::max(0.0, firstBeat);
+    LibraryDb::saveGrid(m_track->path, m_track->bpm, m_track->firstBeat);
+    emit tempoChanged();
+    emit trackChanged();
+    emit trackLoaded(m_track->path, m_track->bpm);
+}
+void DeckController::bpmDouble() { if (m_track && m_track->bpm > 0) setGrid(m_track->bpm * 2, m_track->firstBeat); }
+void DeckController::bpmHalve() { if (m_track && m_track->bpm > 0) setGrid(m_track->bpm / 2, m_track->firstBeat); }
+void DeckController::gridShift(double ms) {
+    if (!m_track || m_track->bpm <= 0) return;
+    double fb = m_track->firstBeat + ms / 1000.0 * m_track->sampleRate;
+    const double bl = m_track->beatLength();
+    while (fb < 0) fb += bl;
+    setGrid(m_track->bpm, fb);
+}
+void DeckController::gridSetBeatHere() {
+    if (!m_track || m_track->bpm <= 0) return;
+    const double bl = m_track->beatLength();
+    setGrid(m_track->bpm, std::fmod(m_deck.position.load(), bl));
+}
+void DeckController::tapBpm() {
+    const qint64 t = m_tapTimer.isValid() ? m_tapTimer.restart() : (m_tapTimer.start(), 0);
+    if (t <= 0 || t > 2000) { m_taps.clear(); return; }
+    m_taps.append(t);
+    if (m_taps.size() > 8) m_taps.removeFirst();
+    if (m_taps.size() >= 3 && m_track) {
+        double avg = 0;
+        for (qint64 v : m_taps) avg += static_cast<double>(v);
+        avg /= m_taps.size();
+        const double bpmNative = 60000.0 / avg / m_deck.baseRate();
+        setGrid(std::round(bpmNative * 100) / 100, m_track->firstBeat);
+    }
 }
 
 void DeckController::stop() {
@@ -164,8 +213,7 @@ void DeckController::cueDown() {
         } else {
             m_cue = quantized(pos);
             m_deck.requestSeek(m_cue);
-            QSettings s;
-            s.setValue(cueKey(m_track->path) + "/cue", m_cue);
+            LibraryDb::saveCue(m_track->path, m_cue);
             emit cuesChanged();
         }
     }
@@ -192,8 +240,7 @@ void DeckController::hotCue(int i) {
     if (!m_track || i < 0 || i >= 8) return;
     if (m_hot[i] < 0) {
         m_hot[i] = quantized(m_deck.position.load());
-        QSettings s;
-        s.setValue(cueKey(m_track->path) + QStringLiteral("/hot%1").arg(i), m_hot[i]);
+        saveHotCues();
         emit cuesChanged();
     } else {
         m_deck.reachedEnd.store(false);
@@ -208,8 +255,7 @@ void DeckController::hotCue(int i) {
 void DeckController::clearHotCue(int i) {
     if (!m_track || i < 0 || i >= 8) return;
     m_hot[i] = -1;
-    QSettings s;
-    s.remove(cueKey(m_track->path) + QStringLiteral("/hot%1").arg(i));
+    saveHotCues();
     emit cuesChanged();
 }
 

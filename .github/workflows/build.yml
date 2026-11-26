@@ -24,7 +24,8 @@ jobs:
           sudo apt-get install -y ninja-build qt6-base-dev qt6-declarative-dev libgl1-mesa-dev rpm \
             qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts \
             qml6-module-qtquick-dialogs qml6-module-qtquick-window qml6-module-qtqml-workerscript \
-            qml6-module-qtquick-templates qml6-module-qt-labs-folderlistmodel
+            qml6-module-qtquick-templates qml6-module-qt-labs-folderlistmodel \
+            libqt6sql6-sqlite libasound2-dev
       - name: Compilar
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release

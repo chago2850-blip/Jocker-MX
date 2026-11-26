@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Analyzer.h"
 
+#include "library/TagReader.h"
 #include "miniaudio.h"
 
 #include <QFileInfo>
@@ -42,6 +43,12 @@ std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QS
     t->path = path;
     t->sampleRate = sampleRate;
     guessTitleArtist(path, &t->title, &t->artist);
+    const TrackTags tags = readTags(path);
+    if (!tags.title.isEmpty()) t->title = tags.title;
+    if (!tags.artist.isEmpty()) t->artist = tags.artist;
+    t->album = tags.album;
+    t->genre = tags.genre;
+    t->musicalKey = tags.key;
 
     ma_uint64 total = 0;
     if (ma_decoder_get_length_in_pcm_frames(&dec, &total) == MA_SUCCESS && total > 0)

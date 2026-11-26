@@ -71,6 +71,17 @@ Rectangle {
                     font.pixelSize: 11; font.weight: Font.DemiBold
                 }
             }
+            Grid {      // herramientas de beatgrid
+                columns: 3
+                spacing: 3
+                visible: root.deck.loaded
+                JxButton { width: 30; height: 18; text: "½"; fontSize: 10; onClicked: root.deck.bpmHalve() }
+                JxButton { width: 30; height: 18; text: "×2"; fontSize: 10; onClicked: root.deck.bpmDouble() }
+                JxButton { width: 30; height: 18; text: "TAP"; fontSize: 8; onClicked: root.deck.tapBpm() }
+                JxButton { width: 30; height: 18; text: "◂"; fontSize: 10; onClicked: root.deck.gridShift(-10) }
+                JxButton { width: 30; height: 18; text: "⌖"; fontSize: 10; onClicked: root.deck.gridSetBeatHere() }
+                JxButton { width: 30; height: 18; text: "▸"; fontSize: 10; onClicked: root.deck.gridShift(10) }
+            }
         }
 
         // ---------- Tiempo + indicador de beat

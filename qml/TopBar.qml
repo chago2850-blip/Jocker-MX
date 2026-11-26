@@ -4,6 +4,7 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    signal openMidi()
     implicitHeight: 48
     color: Theme.bg2
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.border }
@@ -21,6 +22,27 @@ Rectangle {
         Text { text: appVersion; color: Theme.faint; font.pixelSize: 11; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 12 }
         Item { Layout.fillWidth: true }
 
+        Rectangle {     // MIDI: dispositivos y actividad
+            id: midiBtn
+            Layout.preferredHeight: 28; Layout.preferredWidth: midiTxt.implicitWidth + 30
+            radius: 6
+            color: midiMa.containsMouse ? Theme.panel2 : "transparent"
+            border.color: midi.devices.length ? Theme.green : Theme.border
+            Rectangle {
+                id: led
+                width: 8; height: 8; radius: 4
+                anchors.left: parent.left; anchors.leftMargin: 9; anchors.verticalCenter: parent.verticalCenter
+                color: Theme.green; opacity: 0.25
+                Connections { target: midi; function onActivity() { flash.restart() } }
+                SequentialAnimation { id: flash
+                    PropertyAction { target: led; property: "opacity"; value: 1 }
+                    NumberAnimation { target: led; property: "opacity"; to: 0.25; duration: 250 } }
+            }
+            Text { id: midiTxt; anchors.left: led.right; anchors.leftMargin: 7; anchors.verticalCenter: parent.verticalCenter
+                   text: "MIDI" + (midi.devices.length ? " · " + midi.devices.length : ""); color: midi.devices.length ? Theme.green : Theme.dim
+                   font.pixelSize: 11; font.weight: Font.Bold }
+            MouseArea { id: midiMa; anchors.fill: parent; hoverEnabled: true; onClicked: root.openMidi() }
+        }
         Rectangle {
             visible: mixer.noAudioDevice
             radius: 6; color: Qt.rgba(1, 0.3, 0.37, 0.15); border.color: Theme.red

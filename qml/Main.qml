@@ -32,6 +32,9 @@ ApplicationWindow {
     Shortcut { sequence: "Left"; onActivated: mixer.crossfader = Math.max(-1, mixer.crossfader - 0.1) }
     Shortcut { sequence: "Right"; onActivated: mixer.crossfader = Math.min(1, mixer.crossfader + 0.1) }
 
+    MidiDialog { id: midiDialog }
+    Component.onCompleted: if (startupPanel === "midi") midiDialog.open()
+
     background: Rectangle {
         gradient: Gradient {
             GradientStop { position: 0; color: "#120b20" }
@@ -43,7 +46,7 @@ ApplicationWindow {
         anchors.fill: parent
         spacing: 0
 
-        TopBar { Layout.fillWidth: true }
+        TopBar { Layout.fillWidth: true; onOpenMidi: midiDialog.open() }
 
         // Formas de onda desplazables (A arriba, B abajo)
         Rectangle {

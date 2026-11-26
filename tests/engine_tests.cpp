@@ -5,7 +5,11 @@
 // Genera sus propias pistas sintéticas (no requiere archivos externos).
 #include "analysis/Analyzer.h"
 #include "app/DeckController.h"
+#include "app/Mixer.h"
+#include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
+#include "library/LibraryDb.h"
+#include "library/TagReader.h"
 
 #include <QCoreApplication>
 #include <QDir>
@@ -84,6 +88,7 @@ int main(int argc, char** argv) {
     QCoreApplication::setApplicationName("jx-tests");
     QTemporaryDir tmp;
     const double sr = 48000.0;
+    CHECK(jx::LibraryDb::open(tmp.filePath("biblioteca.sqlite")), "base de datos SQLite creada");
 
     std::printf("\n[1] Análisis de BPM y beatgrid\n");
     struct Case { double bpm, first; };
@@ -199,6 +204,128 @@ int main(int argc, char** argv) {
     const double hc = a.hotCues()[0].toDouble();
     CHECK(hc >= 0, "hot cue 1 fijado en %.2f s", hc);
     a.clearHotCue(0);
+
+    std::printf("\n[6] Etiquetas (ID3, FLAC, WAV)\n");
+    {
+        // MP3: etiqueta ID3v2.4 (UTF-8) + una trama MPEG-1 Layer III a 320 kbps
+        auto frame = [](const char* id, const QByteArray& text) {
+            QByteArray body = QByteArray(1, '\x03') + text;
+            QByteArray f(id);
+            const int n = body.size();
+            f.append(char((n >> 21) & 0x7f)); f.append(char((n >> 14) & 0x7f));
+            f.append(char((n >> 7) & 0x7f)); f.append(char(n & 0x7f));
+            f.append(2, '\0');
+            return f + body;
+        };
+        QByteArray frames = frame("TIT2", "Canción de Prueba") + frame("TPE1", "Jocker Ñandú") +
+                            frame("TALB", "Álbum MX") + frame("TCON", "(17)") + frame("TBPM", "126") + frame("TKEY", "8A");
+        QByteArray id3("ID3\x04\x00\x00", 6);
+        const int n = frames.size();
+        id3.append(char((n >> 21) & 0x7f)); id3.append(char((n >> 14) & 0x7f));
+        id3.append(char((n >> 7) & 0x7f)); id3.append(char(n & 0x7f));
+        QByteArray mp3 = id3 + frames;
+        QByteArray audio(400000, '\0');
+        audio[0] = char(0xFF); audio[1] = char(0xFB); audio[2] = char(0xE0); audio[3] = char(0x44);   // 320 kbps, 44.1 kHz
+        mp3 += audio;
+        QFile f(tmp.filePath("prueba.mp3")); f.open(QIODevice::WriteOnly); f.write(mp3); f.close();
+        const jx::TrackTags t = jx::readTags(f.fileName());
+        CHECK(t.title == QStringLiteral("Canción de Prueba") && t.artist == QStringLiteral("Jocker Ñandú"),
+              "ID3v2.4 título/artista con acentos: %s / %s", qPrintable(t.title), qPrintable(t.artist));
+        CHECK(t.album == QStringLiteral("Álbum MX") && t.genre == "Rock" && t.bpm == 126 && t.key == "8A",
+              "ID3 álbum, género (17 → Rock), BPM y tonalidad");
+        CHECK(std::abs(t.duration - 400000 * 8.0 / 320000) < 0.05, "duración MP3 estimada: %.2f s", t.duration);
+
+        // FLAC: STREAMINFO + VORBIS_COMMENT (sin audio)
+        QByteArray fl("fLaC");
+        QByteArray si(34, '\0');
+        const uint32_t srate = 44100; const uint64_t total = 44100ull * 200;
+        si[10] = char(srate >> 12); si[11] = char(srate >> 4); si[12] = char(((srate & 0xF) << 4) | (1 << 1));
+        si[13] = char(0x10 | ((total >> 32) & 0x0F)); si[14] = char(total >> 24); si[15] = char(total >> 16);
+        si[16] = char(total >> 8); si[17] = char(total);
+        fl += QByteArray("\x00\x00\x00\x22", 4) + si;
+        auto le = [](uint32_t v) { QByteArray b(4, '\0'); for (int i = 0; i < 4; ++i) b[i] = char(v >> (8 * i)); return b; };
+        QByteArray vc = le(6) + "jocker";
+        const QList<QByteArray> cs = {"TITLE=Sombra", "ARTIST=MX Crew", "GENRE=House", "BPM=124.5"};
+        vc += le(static_cast<uint32_t>(cs.size()));
+        for (const auto& c : cs) vc += le(static_cast<uint32_t>(c.size())) + c;
+        const int vl = vc.size();
+        fl += QByteArray(1, char(0x84)) + char(vl >> 16) + char(vl >> 8) + char(vl) + vc;
+        QFile ff(tmp.filePath("prueba.flac")); ff.open(QIODevice::WriteOnly); ff.write(fl); ff.close();
+        const jx::TrackTags tf = jx::readTags(ff.fileName());
+        CHECK(tf.title == "Sombra" && tf.artist == "MX Crew" && tf.genre == "House" && std::abs(tf.bpm - 124.5) < 1e-6,
+              "FLAC Vorbis comment: %s / %s / %s / %.1f", qPrintable(tf.title), qPrintable(tf.artist), qPrintable(tf.genre), tf.bpm);
+        CHECK(std::abs(tf.duration - 200.0) < 0.01, "duración FLAC (STREAMINFO): %.2f s", tf.duration);
+
+        const jx::TrackTags tw = jx::readTags(tmp.filePath("t124.wav"));
+        CHECK(std::abs(tw.duration - 60.0) < 0.01, "duración WAV por encabezado: %.2f s", tw.duration);
+    }
+
+    std::printf("\n[7] Biblioteca\n");
+    {
+        QList<jx::ScanEntry> es;
+        for (const QString n : {"prueba.mp3", "prueba.flac", "t124.wav"}) {
+            jx::ScanEntry e; e.path = tmp.filePath(n); e.tags = jx::readTags(e.path); e.mtime = 1; es << e;
+        }
+        jx::LibraryDb::upsertScanned(es);
+        const QString pre = tmp.path() + "/";
+        auto all = jx::LibraryDb::query(jx::LibraryDb::View::All, pre, "", "artist", true);
+        CHECK(all.size() >= 3, "pistas en la biblioteca: %lld", static_cast<long long>(all.size()));
+        auto r1 = jx::LibraryDb::query(jx::LibraryDb::View::All, pre, "ñandú", "artist", true);
+        CHECK(r1.size() == 1 && r1[0].title.startsWith(QStringLiteral("Canción")), "búsqueda sin acentos ni mayúsculas (ñandú → Ñandú)");
+        CHECK(jx::LibraryDb::query(jx::LibraryDb::View::All, pre, "cancion", "artist", true).size() == 1, "«cancion» encuentra «Canción»");
+        auto r2 = jx::LibraryDb::query(jx::LibraryDb::View::All, pre, "bpm:124-125", "bpm", true);
+        bool hasFlac = false; for (auto& r : r2) hasFlac |= r.path.endsWith(".flac");
+        CHECK(hasFlac, "filtro bpm:124-125");
+        jx::LibraryDb::addHistory(tmp.filePath("prueba.flac"), 0);
+        auto h = jx::LibraryDb::query(jx::LibraryDb::View::History, pre, "", "", true);
+        CHECK(h.size() == 3 && h[0].path.endsWith(".flac"), "historial: %lld reproducciones, la más reciente primero", static_cast<long long>(h.size()));
+        QVector<double> hot(8, -1.0); hot[2] = 48000.0;
+        jx::LibraryDb::saveHotCues(tmp.filePath("prueba.flac"), hot);
+        jx::LibraryDb::saveCue(tmp.filePath("prueba.flac"), 1234.0);
+        const jx::TrackState st = jx::LibraryDb::state(tmp.filePath("prueba.flac"));
+        CHECK(st.found && st.cue == 1234.0 && st.hotCues[2] == 48000.0 && st.hotCues[0] < 0, "cues guardados y restaurados");
+        jx::LibraryDb::saveGrid(tmp.filePath("t124.wav"), 62.0, 100.0);
+        CHECK(jx::LibraryDb::state(tmp.filePath("t124.wav")).gridLocked, "beatgrid editado queda bloqueado");
+        QSet<QString> present = {tmp.filePath("prueba.mp3"), tmp.filePath("prueba.flac")};
+        jx::LibraryDb::removeMissing(pre, present);
+        CHECK(jx::LibraryDb::query(jx::LibraryDb::View::All, pre, "", "artist", true).size() == 2, "elimina archivos borrados");
+    }
+
+    std::printf("\n[8] Controladores MIDI\n");
+    {
+        jx::Mixer mx(&eng, {&a, &b});
+        jx::MidiManager midi({&a, &b}, &mx);
+        midi.clearAll();
+        midi.learn("A.volume");
+        midi.injectMessage(0xB0, 7, 100);           // CC 7, canal 1
+        CHECK(midi.learning().isEmpty() && midi.bindings().value("A.volume").toString().startsWith("CC 7"),
+              "MIDI learn asigna CC 7 al fader A (%s)", qPrintable(midi.bindings().value("A.volume").toString()));
+        midi.injectMessage(0xB0, 7, 0);
+        CHECK(a.volume() == 0.0, "CC 7 = 0 baja el fader A");
+        midi.injectMessage(0xB0, 7, 127);
+        CHECK(a.volume() == 1.0, "CC 7 = 127 sube el fader A");
+        midi.learn("B.play");
+        midi.injectMessage(0x91, 36, 127);           // nota 36, canal 2
+        midi.injectMessage(0x81, 36, 0);
+        const bool before = b.playing();
+        midi.injectMessage(0x91, 36, 127);
+        CHECK(b.playing() != before, "nota 36 (canal 2) alterna play en B");
+        midi.learn("xfader");
+        midi.injectMessage(0xB0, 8, 30);            // este mensaje sólo asigna
+        midi.injectMessage(0xB0, 8, 0);
+        CHECK(mx.crossfader() == -1.0, "crossfader por MIDI a la izquierda");
+        midi.injectMessage(0xB0, 8, 64);
+        CHECK(std::abs(mx.crossfader()) < 0.02, "crossfader centrado");
+        midi.learn("A.eqlow");
+        midi.injectMessage(0xB0, 9, 30);
+        midi.injectMessage(0xB0, 9, 0);
+        CHECK(a.eqLow() == -1.0, "EQ graves A al mínimo (kill)");
+        midi.injectMessage(0xB0, 9, 64);
+        CHECK(a.eqLow() == 0.0, "EQ graves A al centro");
+        CHECK(midi.saveMapping(tmp.filePath("mapeo.json")), "mapeo guardado en JSON");
+        midi.clearAll();
+        CHECK(midi.loadMapping(tmp.filePath("mapeo.json")) && midi.bindings().size() == 4, "mapeo recargado (%lld acciones)", static_cast<long long>(midi.bindings().size()));
+    }
 
     std::printf("\nResultado: %d correctas, %d fallidas\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

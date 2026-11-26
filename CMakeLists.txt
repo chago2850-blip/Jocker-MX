@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.1.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.1.0-dev")
+project(JockerMX VERSION 0.2.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.2.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Sql)
 qt_standard_project_setup()
 
 # --- Terceros ---------------------------------------------------------------
@@ -35,6 +35,27 @@ elseif(APPLE)
   target_link_libraries(miniaudio PUBLIC "-framework CoreFoundation" "-framework CoreAudio" "-framework AudioToolbox")
 endif()
 
+# RtMidi (MIT): entrada MIDI multiplataforma
+add_library(rtmidi STATIC third_party/rtmidi/RtMidi.cpp)
+target_include_directories(rtmidi PUBLIC third_party/rtmidi)
+if(APPLE)
+  target_compile_definitions(rtmidi PUBLIC __MACOSX_CORE__)
+  target_link_libraries(rtmidi PUBLIC "-framework CoreMIDI" "-framework CoreAudio" "-framework CoreFoundation")
+elseif(WIN32)
+  target_compile_definitions(rtmidi PUBLIC __WINDOWS_MM__)
+  target_link_libraries(rtmidi PUBLIC winmm)
+elseif(ANDROID)
+  target_compile_definitions(rtmidi PUBLIC __RTMIDI_DUMMY__)
+else()
+  find_package(ALSA)
+  if(ALSA_FOUND)
+    target_compile_definitions(rtmidi PUBLIC __LINUX_ALSA__)
+    target_link_libraries(rtmidi PUBLIC ALSA::ALSA pthread)
+  else()
+    target_compile_definitions(rtmidi PUBLIC __RTMIDI_DUMMY__)
+  endif()
+endif()
+
 # --- Aplicación -------------------------------------------------------------
 qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/main.cpp
@@ -43,6 +64,8 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/engine/Deck.h src/engine/Deck.cpp
   src/engine/AudioEngine.h src/engine/AudioEngine.cpp
   src/analysis/Analyzer.h src/analysis/Analyzer.cpp
+  src/library/TagReader.h src/library/TagReader.cpp
+  src/library/LibraryDb.h src/library/LibraryDb.cpp
 )
 
 set_source_files_properties(qml/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -56,6 +79,7 @@ qt_add_qml_module(jocker-mx
     src/app/Mixer.h src/app/Mixer.cpp
     src/app/LibraryModel.h src/app/LibraryModel.cpp
     src/ui/WaveformItem.h src/ui/WaveformItem.cpp
+    src/control/MidiManager.h src/control/MidiManager.cpp
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
@@ -68,6 +92,7 @@ qt_add_qml_module(jocker-mx
     qml/LibraryPanel.qml
     qml/TopBar.qml
     qml/PitchFader.qml
+    qml/MidiDialog.qml
   RESOURCES
     resources/icon-256.png
     resources/logo-3d-256.png
@@ -75,13 +100,13 @@ qt_add_qml_module(jocker-mx
 )
 # Rutas de recursos resultantes: qrc:/JockerMX/qml/... y qrc:/JockerMX/resources/...
 
-target_include_directories(jocker-mx PRIVATE src src/app src/ui)
+target_include_directories(jocker-mx PRIVATE src src/app src/ui src/control)
 target_compile_definitions(jocker-mx PRIVATE JOCKER_VERSION="${JOCKER_VERSION_STRING}")
 if(MSVC)
   target_compile_definitions(jocker-mx PRIVATE _USE_MATH_DEFINES NOMINMAX)
 endif()
 target_link_libraries(jocker-mx PRIVATE
-  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent rubberband miniaudio)
+  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi)
 
 set_target_properties(jocker-mx PROPERTIES
   OUTPUT_NAME "jocker-mx"
@@ -152,7 +177,7 @@ set(CPACK_PACKAGE_EXECUTABLES "jocker-mx" "Jocker-MX")
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_SECTION "sound")
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-set(CPACK_DEBIAN_PACKAGE_DEPENDS "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates, qml6-module-qt-labs-folderlistmodel")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-dialogs, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qml6-module-qtquick-templates, qml6-module-qt-labs-folderlistmodel, libqt6sql6-sqlite")
 # Fedora / openSUSE
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
@@ -178,11 +203,14 @@ if(JOCKER_BUILD_TESTS)
     tests/engine_tests.cpp
     src/engine/Deck.cpp src/engine/AudioEngine.cpp
     src/analysis/Analyzer.cpp
-    src/app/DeckController.h src/app/DeckController.cpp)
-  target_include_directories(jx-tests PRIVATE src src/app)
+    src/library/TagReader.cpp src/library/LibraryDb.cpp
+    src/app/DeckController.h src/app/DeckController.cpp
+    src/app/Mixer.h src/app/Mixer.cpp
+    src/control/MidiManager.h src/control/MidiManager.cpp)
+  target_include_directories(jx-tests PRIVATE src src/app src/control)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()
-  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Qml Qt6::Concurrent rubberband miniaudio)
+  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi)
   add_test(NAME motor COMMAND jx-tests)
 endif()

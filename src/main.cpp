@@ -3,7 +3,9 @@
 #include "app/DeckController.h"
 #include "app/LibraryModel.h"
 #include "app/Mixer.h"
+#include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
+#include "library/LibraryDb.h"
 
 #include <QCommandLineParser>
 #include <QFontDatabase>
@@ -16,7 +18,7 @@
 #include <QTimer>
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.1.0-dev"
+#define JOCKER_VERSION "0.2.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -38,7 +40,8 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib});
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi)", "nombre");
+    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel});
     cli.process(app);
 
     const int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/JockerMX/resources/fonts/Montserrat.ttf"));
@@ -49,6 +52,8 @@ int main(int argc, char* argv[]) {
         QGuiApplication::setFont(f);
     }
 
+    if (!jx::LibraryDb::open()) qWarning("No se pudo abrir la base de datos de la biblioteca.");
+
     jx::AudioEngine engine(2);
     if (!engine.start()) qWarning("Sin dispositivo de audio: la interfaz funcionará en silencio.");
 
@@ -57,15 +62,20 @@ int main(int argc, char* argv[]) {
     deckB.setPartner(&deckA);
     jx::Mixer mixer(&engine, {&deckA, &deckB});
     jx::LibraryModel library;
+    jx::MidiManager midi({&deckA, &deckB}, &mixer);
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
     QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setBpm);
     QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setBpm);
+    QObject::connect(&deckA, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
+    QObject::connect(&deckB, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
 
     QQmlApplicationEngine qml;
     qml.rootContext()->setContextProperty(QStringLiteral("deckA"), &deckA);
     qml.rootContext()->setContextProperty(QStringLiteral("deckB"), &deckB);
     qml.rootContext()->setContextProperty(QStringLiteral("mixer"), &mixer);
     qml.rootContext()->setContextProperty(QStringLiteral("library"), &library);
+    qml.rootContext()->setContextProperty(QStringLiteral("midi"), &midi);
+    qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
                      []() { QCoreApplication::exit(1); }, Qt::QueuedConnection);

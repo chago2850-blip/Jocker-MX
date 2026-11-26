@@ -13,6 +13,9 @@ struct Track {
     QString path;
     QString title;
     QString artist;
+    QString album;
+    QString genre;
+    QString musicalKey;
 
     double sampleRate = 48000.0;      // igual a la frecuencia del motor
     int64_t frames = 0;               // cuadros estéreo

@@ -5,6 +5,7 @@
 #include "engine/AudioEngine.h"
 
 #include <QObject>
+#include <QElapsedTimer>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 #include <memory>
@@ -133,6 +134,12 @@ public:
     Q_INVOKABLE void scratchMove(double rate);
     Q_INVOKABLE void scratchEnd();
     Q_INVOKABLE void resetPitch() { setPitch(0); }
+    Q_INVOKABLE void bpmDouble();
+    Q_INVOKABLE void bpmHalve();
+    Q_INVOKABLE void gridShift(double ms);
+    Q_INVOKABLE void gridSetBeatHere();
+    Q_INVOKABLE void tapBpm();
+    Q_INVOKABLE void setGrid(double bpm, double firstBeat);
 
     void tick();   // llamado ~60 Hz por la aplicación
 
@@ -151,9 +158,11 @@ signals:
     void mixerChanged();
     void levelChanged();
     void trackLoaded(const QString& path, double bpm);
+    void played(const QString& path);
 
 private:
     void applyPitch();
+    void saveHotCues();
     double quantized(double frame) const;
     void setLoop(double start, double beats);
     static float knobToEqDb(double v);
@@ -178,6 +187,9 @@ private:
     bool m_lastPlaying = false;
     bool m_wasPlayingBeforeScratch = false;
     double m_lastPos = -1;
+    bool m_historyLogged = false;
+    QElapsedTimer m_tapTimer;
+    QList<qint64> m_taps;
 
     double m_gain = 0, m_eqHigh = 0, m_eqMid = 0, m_eqLow = 0, m_filter = 0, m_volume = 0.85;
     double m_level = 0;

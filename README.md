@@ -10,7 +10,43 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> Estado: **fase de planeación (F0)**. Este repositorio contiene la investigación, la arquitectura, el plan de trabajo y la identidad visual. El desarrollo del código comienza con la fase F0.
+> **Estado: 0.1.0-dev (alfa).** Ya funciona el primer corte: 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda y navegador. Ver [lo que ya funciona](#lo-que-ya-funciona-en-010-dev).
+
+<p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX 0.1.0-dev" width="100%"></p>
+
+## Lo que ya funciona en 0.1.0-dev
+- **2 decks** con carga de **MP3, WAV y FLAC** (arrastrar y soltar o botones A/B del navegador).
+- **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
+- **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
+- **CUE** estilo CDJ (con vista previa mientras se mantiene), **8 hot cues** que se guardan por pista (clic derecho = borrar), **cuantización**.
+- **Loops automáticos** (½ a 16 beats), mitad/doble, **beat jump**.
+- **Plato virtual**: centro = scratch, aro = empujar/frenar; también se puede hacer scratch arrastrando la forma de onda.
+- **Mezclador**: gain, EQ de 3 bandas con *kill*, filtro HPF/LPF de una perilla, faders, crossfader, VU por canal y maestro, **limitador** maestro.
+- **Audífonos (PFL)** en tarjetas de 4 canales o modo **SPLIT** (cue izquierda / master derecha) con un cable divisor.
+- **Formas de onda de 3 bandas** (graves magenta, medios oro, agudos cian) con rejilla de beats, cues y loops.
+- **Navegador** de carpeta con búsqueda instantánea y ordenamiento.
+- Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader.
+
+### Instalar
+Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-blip/Jocker-MX/releases) (lo genera automáticamente GitHub Actions):
+
+| Sistema | Archivo |
+|---|---|
+| macOS 12+ (Apple Silicon e Intel) | `.dmg` — la primera vez: clic derecho → *Abrir* (aún sin firma de Apple) |
+| Windows 10/11 | instalador `.exe` o `.zip` portátil |
+| Ubuntu 24.04+ / Debian 13+ | `.deb` → `sudo apt install ./jocker-mx_*.deb` |
+| Fedora 40+ | `.rpm` → `sudo dnf install ./jocker-mx-*.rpm` |
+| Android | en desarrollo (fase F11) |
+
+### Compilar desde el código
+```bash
+# Requisitos: CMake ≥ 3.21, compilador C++20, Qt 6.4+ (Quick, QuickControls2, Concurrent)
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+./build/jx-tests          # pruebas del motor
+./build/jocker-mx         # ejecutar
+```
+Opciones útiles: `jocker-mx --library ~/Música -a pista1.mp3 -b pista2.flac --play`.
 
 ## Funciones previstas
 - 🎚️ **2 a 99 decks**, mezclador completo, sync, *key lock*, hot cues, loops, *slip*, beat jump, Sandbox.
@@ -31,6 +67,7 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 | [03 · Arquitectura](docs/03-ARQUITECTURA.md) | Pila tecnológica, motor de audio, stems, UI, Android |
 | [04 · Plan de trabajo](docs/04-PLAN-DE-TRABAJO.md) | Fases F0-F13, hitos 0.1 → 1.0 en 24 meses, equipo y riesgos |
 | [05 · Licencias y dependencias](docs/05-LICENCIAS-Y-DEPENDENCIAS.md) | Compatibilidad GPL-3.0+, modelos de IA, *clean room* |
+| [06 · Manual de usuario](docs/06-MANUAL-DE-USUARIO.md) | Cómo usar Jocker-MX 0.1 paso a paso |
 
 ## Hoja de ruta
 | Versión | Mes | Hito |

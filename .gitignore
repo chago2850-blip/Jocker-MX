@@ -11,3 +11,4 @@ android/.gradle/
 android/build/
 models/*.onnx
 models/*.gguf
+build*/

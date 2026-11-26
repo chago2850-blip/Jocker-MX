@@ -24,7 +24,7 @@ Jocker-MX se distribuye bajo **GNU General Public License v3.0 o posterior** (`G
 |---|---|---|---|
 | Qt 6 | LGPL-3.0 / GPL-3.0 | Sí | Al ser Jocker-MX GPL-3.0+, puede usarse la opción GPL de Qt en todas las plataformas (incluida Android) |
 | FFmpeg | LGPL-2.1+ / GPL-2.0+ | Sí | Puede compilarse en modo GPL; evitar `--enable-nonfree` |
-| Rubber Band | GPL-2.0+ | Sí | |
+| Rubber Band (incluido en `third_party/`) | GPL-2.0+ | Sí | Key lock desde la versión 0.1 |
 | SoundTouch | LGPL-2.1 | Sí | |
 | qm-dsp | GPL-2.0+ | Sí | |
 | libKeyFinder | GPL-3.0 | Sí | |
@@ -36,6 +36,7 @@ Jocker-MX se distribuye bajo **GNU General Public License v3.0 o posterior** (`G
 | SQLite | Dominio público | Sí | |
 | TagLib | LGPL-2.1 / MPL-1.1 | Sí | |
 | RtMidi / hidapi | MIT / BSD | Sí | |
+| miniaudio (incluido en `third_party/`) | Dominio público / MIT-0 | Sí | E/S de audio y decodificación MP3/WAV/FLAC desde la versión 0.1 |
 | Ableton Link | GPL-2.0+ (o comercial) | Sí | |
 | libshout | LGPL-2.0+ | Sí | |
 | projectM | LGPL-2.1 | Sí | Revisar licencia de cada paquete de presets |

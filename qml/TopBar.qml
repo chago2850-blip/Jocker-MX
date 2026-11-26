@@ -22,6 +22,31 @@ Rectangle {
         Text { text: appVersion; color: Theme.faint; font.pixelSize: 11; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 12 }
         Item { Layout.fillWidth: true }
 
+        Rectangle {     // Grabación
+            Layout.preferredHeight: 28; Layout.preferredWidth: recTxt.implicitWidth + 34
+            radius: 6
+            color: recorder.recording ? Qt.rgba(1, 0.3, 0.37, 0.18) : (recMa.containsMouse ? Theme.panel2 : "transparent")
+            border.color: recorder.recording ? Theme.red : Theme.border
+            Rectangle {
+                id: recDot
+                width: 10; height: 10; radius: 5
+                anchors.left: parent.left; anchors.leftMargin: 9; anchors.verticalCenter: parent.verticalCenter
+                color: Theme.red
+                opacity: recorder.recording ? 1 : 0.45
+                SequentialAnimation on opacity {
+                    running: recorder.recording; loops: Animation.Infinite
+                    NumberAnimation { to: 0.25; duration: 500 } NumberAnimation { to: 1; duration: 500 }
+                }
+            }
+            Text {
+                id: recTxt
+                anchors.left: recDot.right; anchors.leftMargin: 7; anchors.verticalCenter: parent.verticalCenter
+                text: recorder.recording ? ("REC  " + Theme.formatTime(recorder.seconds).slice(0, 5) + (recorder.trackCount ? "  ·  " + recorder.trackCount + " pistas" : "")) : "REC"
+                color: recorder.recording ? Theme.red : Theme.dim
+                font.pixelSize: 11; font.weight: Font.Bold
+            }
+            MouseArea { id: recMa; anchors.fill: parent; hoverEnabled: true; onClicked: recorder.toggle() }
+        }
         Rectangle {     // MIDI: dispositivos y actividad
             id: midiBtn
             Layout.preferredHeight: 28; Layout.preferredWidth: midiTxt.implicitWidth + 30

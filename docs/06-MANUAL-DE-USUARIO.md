@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.3.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.4.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -61,7 +61,22 @@ Clic en un efecto lo enciende (otro clic lo apaga). El botón numérico cambia l
 ### Corregir el beatgrid
 Junto al BPM de cada deck: **½** y **×2** (si se detectó a mitad o al doble), **TAP** (pulsa al ritmo varias veces), **◂ / ▸** (mueve la rejilla 10 ms) y **⌖** (marca un beat justo en la posición actual). Una vez corregido, el beatgrid queda guardado y no se vuelve a analizar.
 
-## 5. Controladores MIDI
+## 5. Sampler
+Abre la pestaña **🥁 Sampler** (abajo, junto a Biblioteca). Hay 8 pads con sonidos incluidos: BOCINA, SIRENA, LÁSER, BOMBO, PALMAS, SUBIDA, IMPACTO y REWIND (creados por Jocker-MX, libres de derechos).
+- **Clic** (o teclas `Z X C V B N M ,`) dispara el pad. La barra inferior muestra su avance.
+- Botón de **modo** en cada pad: **ONE** (suena completo una vez), **LOOP** (se repite hasta que lo vuelvas a tocar) y **HOLD** (suena mientras lo mantienes presionado).
+- **Tu propio sonido**: clic derecho en el pad para elegir un archivo (WAV, MP3, FLAC u OGG) o arrástralo sobre el pad. **↺** regresa al sonido incluido. Se recuerda al volver a abrir la app.
+- **Volumen** del sampler, **🎧 Audífonos** para escucharlo también en cue y **Detener todo**.
+- Los pads, su volumen y el botón de grabar también se pueden asignar a tu controlador MIDI.
+
+## 6. Grabar tu mezcla
+Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:
+- `Mezcla … .wav`: tu mezcla completa en WAV de 24 bits (lo que sale por el master, con efectos y sampler).
+- `Mezcla … .txt`: la **lista de canciones** con el minuto en que entró cada una.
+- `Mezcla … .cue`: hoja CUE para quemar un CD o dividir la mezcla en pistas con otros programas.
+Un WAV de 24 bits ocupa unos 17 MB por minuto (alrededor de 1 GB por hora).
+
+## 7. Controladores MIDI
 1. Conecta tu controlador por USB. En la barra superior el botón **MIDI** se pone verde y muestra cuántos dispositivos hay; el punto parpadea con cada mensaje recibido.
 2. Pulsa **MIDI** para abrir los ajustes. Junto a cada acción pulsa **Aprender** y mueve el control de tu equipo: queda asignado.
 3. Para el **plato**: asigna «Plato (jog)» girándolo y «Toque del plato» tocando su superficie. Con el plato tocado hace *scratch*; girando el aro, empuja o frena. Si el scratch va muy rápido o lento, ajusta **Pasos por vuelta**.
@@ -69,7 +84,7 @@ Junto al BPM de cada deck: **½** y **×2** (si se detectó a mitad o al doble),
 
 Próximamente: mapeos listos para los controladores más populares y luces (LED) del controlador.
 
-## 6. Atajos de teclado
+## 8. Atajos de teclado
 | Tecla | Acción |
 |---|---|
 | `Q` / `P` | Play/pausa deck A / B |
@@ -78,11 +93,13 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 | `7 8 9 0` | Hot cues 1-4 del deck B |
 | `A` / `L` | Loop de 4 beats en A / B |
 | `←` / `→` | Mover el crossfader |
+| `Z X C V B N M ,` | Pads 1-8 del sampler |
+| `Ctrl+R` | Iniciar / detener la grabación |
 
-## 7. Solución de problemas
+## 9. Solución de problemas
 - **"Sin dispositivo de audio"**: el sistema no encontró tarjeta de sonido; la interfaz funciona pero en silencio. Conecta una salida de audio y reinicia la app.
 - **Una pista no carga**: en esta versión se leen MP3, WAV, FLAC y OGG. AAC/M4A y video llegarán con el decodificador FFmpeg.
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
-## 8. Próximamente
-Sampler, más efectos, stems con IA, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+## 10. Próximamente
+Más efectos, stems con IA, AAC/M4A, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

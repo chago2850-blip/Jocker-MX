@@ -3,6 +3,8 @@
 #include "app/DeckController.h"
 #include "app/LibraryModel.h"
 #include "app/Mixer.h"
+#include "app/RecordingController.h"
+#include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
 #include "library/LibraryDb.h"
@@ -18,7 +20,7 @@
 #include <QTimer>
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.3.0-dev"
+#define JOCKER_VERSION "0.4.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -40,7 +42,7 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi)", "nombre");
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler)", "nombre");
     cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel});
     cli.process(app);
 
@@ -62,7 +64,9 @@ int main(int argc, char* argv[]) {
     deckB.setPartner(&deckA);
     jx::Mixer mixer(&engine, {&deckA, &deckB});
     jx::LibraryModel library;
-    jx::MidiManager midi({&deckA, &deckB}, &mixer);
+    jx::SamplerController sampler(&engine);
+    jx::RecordingController recorder(&engine, {&deckA, &deckB});
+    jx::MidiManager midi({&deckA, &deckB}, &mixer, &sampler, &recorder);
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
     QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
     QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
@@ -75,6 +79,8 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("mixer"), &mixer);
     qml.rootContext()->setContextProperty(QStringLiteral("library"), &library);
     qml.rootContext()->setContextProperty(QStringLiteral("midi"), &midi);
+    qml.rootContext()->setContextProperty(QStringLiteral("sampler"), &sampler);
+    qml.rootContext()->setContextProperty(QStringLiteral("recorder"), &recorder);
     qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -102,6 +108,7 @@ int main(int argc, char* argv[]) {
         });
     }
     const int rc = app.exec();
+    recorder.stop();   // cierra el WAV y escribe la lista de canciones
     engine.stop();
     return rc;
 }

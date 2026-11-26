@@ -7,6 +7,8 @@
 #include "analysis/KeyDetector.h"
 #include "app/DeckController.h"
 #include "app/Mixer.h"
+#include "app/RecordingController.h"
+#include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
 #include "library/LibraryDb.h"
@@ -401,6 +403,76 @@ int main(int argc, char** argv) {
         renderSecs(0.5);
         std::vector<float> off; renderSecs(0.3, &off);
         CHECK(rms(off) < 0.001, "efecto apagado y deck en pausa: silencio");
+    }
+
+    std::printf("\n[11] Sampler\n");
+    {
+        if (a.playing()) a.playPause();
+        if (b.playing()) b.playPause();
+        a.setFxType(0); b.setFxType(0);
+        renderSecs(0.5);
+        jx::SamplerController smp(&eng);
+        for (int i = 0; i < 8; ++i) { smp.resetSlot(i); smp.setMode(i, 0); }
+        CHECK(smp.names().size() == 8 && smp.names()[0] == "BOCINA" && smp.names()[3] == "BOMBO", "8 sonidos incluidos (%s…)", qPrintable(smp.names().mid(0, 4).join(", ")));
+        std::vector<float> c1; renderSecs(0.3, &c1);
+        CHECK(rms(c1) < 0.001, "sampler en silencio sin disparar");
+        smp.press(3);
+        std::vector<float> c2; renderSecs(0.3, &c2);
+        CHECK(rms(c2) > 0.05, "pad 4 (BOMBO) suena al dispararlo (RMS %.3f)", rms(c2));
+        renderSecs(1.0);
+        std::vector<float> c3; renderSecs(0.2, &c3);
+        CHECK(rms(c3) < 0.001, "modo ONE: termina solo");
+        smp.setMode(4, jx::Sampler::Loop);
+        smp.press(4);
+        renderSecs(2.0);                                  // más largo que la muestra (0.5 s)
+        std::vector<float> c4; renderSecs(0.3, &c4);
+        CHECK(rms(c4) > 0.01, "modo LOOP: sigue sonando tras el final de la muestra");
+        smp.press(4);
+        renderSecs(0.1);
+        std::vector<float> c5; renderSecs(0.2, &c5);
+        CHECK(rms(c5) < 0.001, "modo LOOP: otro toque lo detiene");
+        smp.setMode(1, jx::Sampler::Hold);
+        smp.press(1);
+        renderSecs(0.3);
+        smp.release(1);
+        renderSecs(0.05);
+        std::vector<float> c6; renderSecs(0.2, &c6);
+        CHECK(rms(c6) < 0.001, "modo HOLD: se detiene al soltar");
+        CHECK(smp.loadFile(2, tmp.filePath("t124.wav")) && smp.names()[2] == "T124", "cargar sonido propio en un pad (%s)", qPrintable(smp.names()[2]));
+        smp.resetSlot(2);
+    }
+
+    std::printf("\n[12] Grabación\n");
+    {
+        jx::RecordingController rec(&eng, {&a, &b});
+        rec.setFolder(tmp.filePath("grabaciones"));
+        a.playPause();                                   // ya sonando: entra al inicio de la lista
+        CHECK(rec.start() && rec.recording(), "grabación iniciada");
+        renderSecs(3.0);
+        QElapsedTimer w; w.start();
+        while (rec.seconds() < 2.9 && w.elapsed() < 3000) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+        rec.stop();
+        a.playPause();
+        QFile f(rec.lastFile());
+        const bool opened = f.open(QIODevice::ReadOnly);
+        const QByteArray hdr = f.read(44);
+        const qint64 size = f.size();
+        auto le32 = [&](int off) { return static_cast<uint32_t>(static_cast<uchar>(hdr[off]) | (static_cast<uchar>(hdr[off + 1]) << 8) |
+                                                              (static_cast<uchar>(hdr[off + 2]) << 16) | (static_cast<uchar>(hdr[off + 3]) << 24)); };
+        const double secs = opened ? le32(40) / (sr * 6.0) : 0;
+        CHECK(opened && hdr.startsWith("RIFF") && le32(40) + 44 == size, "WAV válido de 24 bits (%lld bytes)", static_cast<long long>(size));
+        CHECK(std::abs(secs - 3.0) < 0.1, "duración grabada %.2f s (3 s mezclados)", secs);
+        f.seek(44 + static_cast<qint64>(sr * 6));
+        const QByteArray pcm = f.read(6000);
+        int nonzero = 0; for (char c : pcm) nonzero += c != 0;
+        CHECK(nonzero > 1000, "la grabación contiene audio");
+        const QString base = rec.lastFile().left(rec.lastFile().size() - 4);
+        QFile txt(base + ".txt"); txt.open(QIODevice::ReadOnly);
+        const QString list = QString::fromUtf8(txt.readAll());
+        QFile cue(base + ".cue"); cue.open(QIODevice::ReadOnly);
+        const QString cueText = QString::fromUtf8(cue.readAll());
+        CHECK(list.contains("t124") && cueText.contains("TRACK 01") && cueText.contains("INDEX 01 00:00"),
+              "lista de canciones (.txt) y hoja .cue generadas");
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

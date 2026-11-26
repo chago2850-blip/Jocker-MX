@@ -5,6 +5,8 @@
 #include "Biquad.h"
 #include "Deck.h"
 #include "Effects.h"
+#include "Recorder.h"
+#include "Sampler.h"
 
 #include <QString>
 #include <atomic>
@@ -42,6 +44,8 @@ public:
     Deck& deck(int i) { return *m_decks[i]; }
     ChannelParams& channel(int i) { return *m_channels[i]; }
     EffectUnit& effects(int i) { return *m_fx[i]; }
+    Sampler& sampler() { return m_sampler; }
+    Recorder& recorder() { return m_recorder; }
 
     double sampleRate() const { return m_sr; }
     int outputChannels() const { return m_outCh; }
@@ -75,6 +79,8 @@ private:
     std::vector<ChannelDsp> m_dsp;
     std::vector<std::vector<float>> m_deckBuf;
     std::vector<float> m_master, m_cue;
+    Sampler m_sampler;
+    Recorder m_recorder;
 
     ma_context* m_ctx = nullptr;
     ma_device* m_dev = nullptr;

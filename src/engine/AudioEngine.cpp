@@ -41,7 +41,7 @@ AudioEngine::AudioEngine(int numDecks) {
     m_cue.assign(kMaxBlock * 2, 0.f);
 }
 
-AudioEngine::~AudioEngine() { stop(); }
+AudioEngine::~AudioEngine() { m_recorder.stop(); stop(); }
 
 bool AudioEngine::start() {
     if (m_dev) return true;
@@ -85,6 +85,7 @@ bool AudioEngine::start() {
     m_backend = QString::fromUtf8(ma_get_backend_name(m_ctx->backend));
     for (auto& d : m_decks) d->prepare(m_sr, kMaxBlock);
     for (auto& f : m_fx) f->prepare(m_sr);
+    m_sampler.prepare(m_sr);
 
     if (ma_device_start(m_dev) != MA_SUCCESS) {
         qWarning() << "No se pudo iniciar el dispositivo de audio";
@@ -101,6 +102,7 @@ void AudioEngine::prepareOffline(double sampleRate) {
     m_null = true;
     for (auto& d : m_decks) d->prepare(m_sr, kMaxBlock);
     for (auto& f : m_fx) f->prepare(m_sr);
+    m_sampler.prepare(m_sr);
 }
 
 void AudioEngine::stop() {
@@ -202,6 +204,9 @@ void AudioEngine::render(float* out, int n) {
         p.peak.store(peak, std::memory_order_relaxed);
     }
 
+    // Sampler directo al master (y a audífonos si está en PFL)
+    m_sampler.process(m_master.data(), m_cue.data(), n);
+
     // Volumen maestro + limitador (ataque instantáneo, liberación ~120 ms)
     const float mv = masterVolume.load(std::memory_order_relaxed);
     const float rel = std::exp(-1.f / (0.12f * static_cast<float>(m_sr)));
@@ -218,6 +223,7 @@ void AudioEngine::render(float* out, int n) {
         m_master[2 * i] = l; m_master[2 * i + 1] = r;
         pkL = std::max(pkL, std::abs(l)); pkR = std::max(pkR, std::abs(r));
     }
+    m_recorder.push(m_master.data(), n);     // grabación del master final (sin bloqueos)
     masterPeakL.store(pkL, std::memory_order_relaxed);
     masterPeakR.store(pkR, std::memory_order_relaxed);
     limiterGainReduction.store(1.f - minG, std::memory_order_relaxed);

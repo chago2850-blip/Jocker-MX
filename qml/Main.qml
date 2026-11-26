@@ -29,6 +29,15 @@ ApplicationWindow {
     Shortcut { sequence: "0"; onActivated: deckB.hotCue(3) }
     Shortcut { sequence: "A"; onActivated: deckA.autoLoop(4) }
     Shortcut { sequence: "L"; onActivated: deckB.autoLoop(4) }
+    Shortcut { sequence: "Z"; onActivated: sampler.press(0) }
+    Shortcut { sequence: "X"; onActivated: sampler.press(1) }
+    Shortcut { sequence: "C"; onActivated: sampler.press(2) }
+    Shortcut { sequence: "V"; onActivated: sampler.press(3) }
+    Shortcut { sequence: "B"; onActivated: sampler.press(4) }
+    Shortcut { sequence: "N"; onActivated: sampler.press(5) }
+    Shortcut { sequence: "M"; onActivated: sampler.press(6) }
+    Shortcut { sequence: ","; onActivated: sampler.press(7) }
+    Shortcut { sequence: "Ctrl+R"; onActivated: recorder.toggle() }
     Shortcut { sequence: "Left"; onActivated: mixer.crossfader = Math.max(-1, mixer.crossfader - 0.1) }
     Shortcut { sequence: "Right"; onActivated: mixer.crossfader = Math.min(1, mixer.crossfader + 0.1) }
 
@@ -116,11 +125,31 @@ ApplicationWindow {
             DeckPanel { deck: deckB; mirrored: true; Layout.fillWidth: true; Layout.fillHeight: true }
         }
 
-        LibraryPanel {
+        // Pestañas inferiores: biblioteca / sampler
+        Row {
+            Layout.leftMargin: 14
+            spacing: 6
+            Repeater {
+                model: ["🎵  Biblioteca", "🥁  Sampler"]
+                Rectangle {
+                    width: 128; height: 26; radius: 6
+                    color: bottomTabs.currentIndex === index ? Theme.panel : "transparent"
+                    border.color: bottomTabs.currentIndex === index ? Theme.gold : Theme.border
+                    Text { anchors.centerIn: parent; text: modelData; font.pixelSize: 12; font.weight: Font.DemiBold
+                           color: bottomTabs.currentIndex === index ? Theme.gold : Theme.dim }
+                    MouseArea { anchors.fill: parent; onClicked: bottomTabs.currentIndex = index }
+                }
+            }
+        }
+        StackLayout {
+            id: bottomTabs
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: 10
-            Layout.topMargin: 0
+            Layout.topMargin: 4
+            currentIndex: startupPanel === "sampler" ? 1 : 0
+            LibraryPanel {}
+            SamplerPanel {}
         }
     }
 }

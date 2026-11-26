@@ -4,6 +4,8 @@
 
 #include "app/DeckController.h"
 #include "app/Mixer.h"
+#include "app/RecordingController.h"
+#include "app/SamplerController.h"
 
 #include "RtMidi.h"
 
@@ -44,13 +46,17 @@ const ActionDef kDeckActions[] = {
 };
 const ActionDef kGlobalActions[] = {
     {"xfader", "Crossfader"}, {"master", "Volumen master"}, {"cuemix", "Mezcla cue / master"},
-    {"phones", "Volumen de audífonos"},
+    {"phones", "Volumen de audífonos"}, {"rec", "Grabar mezcla"}, {"samplervol", "Volumen del sampler"},
+    {"sampler1", "Pad de sampler 1"}, {"sampler2", "Pad de sampler 2"}, {"sampler3", "Pad de sampler 3"},
+    {"sampler4", "Pad de sampler 4"}, {"sampler5", "Pad de sampler 5"}, {"sampler6", "Pad de sampler 6"},
+    {"sampler7", "Pad de sampler 7"}, {"sampler8", "Pad de sampler 8"},
 };
 double centered(double v) { const double x = v * 2.0 - 1.0; return std::abs(x) < 0.02 ? 0.0 : x; }
 } // namespace
 
-MidiManager::MidiManager(QList<DeckController*> decks, Mixer* mixer, QObject* parent)
-    : QObject(parent), m_decks(std::move(decks)), m_mixer(mixer) {
+MidiManager::MidiManager(QList<DeckController*> decks, Mixer* mixer, SamplerController* sampler,
+                         RecordingController* recorder, QObject* parent)
+    : QObject(parent), m_decks(std::move(decks)), m_mixer(mixer), m_sampler(sampler), m_recorder(recorder) {
     loadMapping();
     refreshDevices();
     m_pollTimer.setInterval(2500);
@@ -123,7 +129,8 @@ QVariantList MidiManager::actions() const {
             out << QVariantMap{{"id", pre + a.id}, {"label", QString::fromUtf8(a.label)}, {"group", "Deck " + QString(QChar('A' + d))}};
     }
     for (const ActionDef& a : kGlobalActions)
-        out << QVariantMap{{"id", QString::fromLatin1(a.id)}, {"label", QString::fromUtf8(a.label)}, {"group", "Mezclador"}};
+        out << QVariantMap{{"id", QString::fromLatin1(a.id)}, {"label", QString::fromUtf8(a.label)},
+                           {"group", QString::fromLatin1(a.id).startsWith("sampler") ? "Sampler" : "Mezclador y grabación"}};
     return out;
 }
 
@@ -213,6 +220,12 @@ void MidiManager::dispatch(const QString& action, int type, int value, int value
         else if (action == "master") m_mixer->setMasterVolume(v);
         else if (action == "cuemix") m_mixer->setCueMix(v);
         else if (action == "phones") m_mixer->setHeadphoneVolume(v);
+        else if (action == "samplervol" && m_sampler) m_sampler->setVolume(v);
+        else if (action == "rec" && m_recorder && pressed) m_recorder->toggle();
+        else if (action.startsWith("sampler") && m_sampler) {
+            const int slot = action.mid(7).toInt() - 1;
+            pressed ? m_sampler->press(slot) : m_sampler->release(slot);
+        }
         return;
     }
     const int di = action.at(0).unicode() - 'A';

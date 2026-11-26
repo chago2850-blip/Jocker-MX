@@ -17,6 +17,8 @@ namespace jx {
 
 class DeckController;
 class Mixer;
+class SamplerController;
+class RecordingController;
 
 // Controladores MIDI: entradas de todos los dispositivos, mapeo de mensajes a acciones y MIDI learn.
 class MidiManager : public QObject {
@@ -32,7 +34,8 @@ class MidiManager : public QObject {
     Q_PROPERTY(QString mappingFile READ mappingFile CONSTANT)
 
 public:
-    MidiManager(QList<DeckController*> decks, Mixer* mixer, QObject* parent = nullptr);
+    MidiManager(QList<DeckController*> decks, Mixer* mixer, SamplerController* sampler = nullptr,
+                RecordingController* recorder = nullptr, QObject* parent = nullptr);
     ~MidiManager() override;
 
     QStringList devices() const { return m_deviceNames; }
@@ -72,6 +75,8 @@ private:
 
     QList<DeckController*> m_decks;
     Mixer* m_mixer;
+    SamplerController* m_sampler;
+    RecordingController* m_recorder;
     std::vector<std::unique_ptr<Input>> m_inputs;
     QStringList m_deviceNames;
     QHash<int, QString> m_map;            // clave del mensaje → acción

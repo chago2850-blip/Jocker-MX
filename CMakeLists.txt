@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.3.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.3.0-dev")
+project(JockerMX VERSION 0.4.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.4.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -64,6 +64,8 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/engine/Deck.h src/engine/Deck.cpp
   src/engine/AudioEngine.h src/engine/AudioEngine.cpp
   src/engine/Effects.h src/engine/Effects.cpp
+  src/engine/Sampler.h src/engine/Sampler.cpp
+  src/engine/Recorder.h src/engine/Recorder.cpp
   src/analysis/Analyzer.h src/analysis/Analyzer.cpp
   src/analysis/KeyDetector.h src/analysis/KeyDetector.cpp
   src/library/TagReader.h src/library/TagReader.cpp
@@ -82,6 +84,8 @@ qt_add_qml_module(jocker-mx
     src/app/LibraryModel.h src/app/LibraryModel.cpp
     src/ui/WaveformItem.h src/ui/WaveformItem.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
+    src/app/SamplerController.h src/app/SamplerController.cpp
+    src/app/RecordingController.h src/app/RecordingController.cpp
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
@@ -95,6 +99,7 @@ qt_add_qml_module(jocker-mx
     qml/TopBar.qml
     qml/PitchFader.qml
     qml/MidiDialog.qml
+    qml/SamplerPanel.qml
   RESOURCES
     resources/icon-256.png
     resources/logo-3d-256.png
@@ -203,12 +208,14 @@ if(JOCKER_BUILD_TESTS)
   enable_testing()
   add_executable(jx-tests
     tests/engine_tests.cpp
-    src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp
+    src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
     src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/app/DeckController.h src/app/DeckController.cpp
     src/app/Mixer.h src/app/Mixer.cpp
-    src/control/MidiManager.h src/control/MidiManager.cpp)
+    src/control/MidiManager.h src/control/MidiManager.cpp
+    src/app/SamplerController.h src/app/SamplerController.cpp
+    src/app/RecordingController.h src/app/RecordingController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)

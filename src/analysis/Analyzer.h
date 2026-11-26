@@ -6,6 +6,7 @@
 
 #include <QString>
 #include <memory>
+#include <vector>
 
 namespace jx {
 
@@ -18,6 +19,9 @@ struct BeatInfo {
 // Decodifica un archivo (WAV, FLAC, MP3) a estéreo float con la frecuencia del motor
 // y calcula forma de onda + BPM/beatgrid. Seguro para llamarse desde un hilo de trabajo.
 std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QString* error);
+
+// Sólo decodifica a estéreo float (para muestras del sampler).
+bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error);
 
 // Detección de tempo y fase del primer beat sobre audio estéreo intercalado.
 BeatInfo detectBeats(const float* pcm, int64_t frames, double sampleRate);

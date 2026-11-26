@@ -133,7 +133,8 @@ double AutomixQueue::totalDuration() const {
 AutomixController::AutomixController(DeckController* a, DeckController* b, Mixer* mixer, QObject* parent)
     : QObject(parent), m_a(a), m_b(b), m_mixer(mixer) {
     QSettings s;
-    m_beats = std::clamp(s.value("automix/beats", 16).toInt(), 4, 64);
+    m_beats = s.value("automix/beats", 0).toInt();
+    m_beats = m_beats <= 0 ? 0 : std::clamp(m_beats, 4, 64);
     m_bassSwap = s.value("automix/bassSwap", true).toBool();
     m_tempoReturn = s.value("automix/tempoReturn", true).toBool();
     m_repeat = s.value("automix/repeat", false).toBool();
@@ -157,12 +158,13 @@ void AutomixController::setStatus(const QString& s) {
 }
 
 void AutomixController::setTransitionBeats(int b) {
-    b = std::clamp(b, 4, 64);
+    b = b <= 0 ? 0 : std::clamp(b, 4, 64);
     if (b == m_beats) return;
     m_beats = b;
     QSettings().setValue("automix/beats", b);
     if (m_state == State::Playing && m_cur >= 0) {
         if (const Track* t = deck(m_cur)->track()) m_curPts = computeMixPoints(*t, m_beats);
+        m_nextReady = false;   // volver a planear la transición con la pista ya cargada
     }
     emit settingsChanged();
 }
@@ -378,12 +380,25 @@ void AutomixController::prepareNext() {
     m_nextPts = computeMixPoints(*t, m_beats);
     o->setSyncLock(false);
     o->resetPitch();
-    o->seekSeconds(m_nextPts.mixIn);
     const Track* ct = cur->track();
+    if (ct) m_curPts = computeMixPoints(*ct, m_beats);
     m_nextSynced = ct && m_curPts.beatAligned && m_nextPts.beatAligned && tempoCompatible(cur->bpm(), t->bpm, 0.08);
+    m_planText.clear();
+    if (ct) {
+        const TransitionPlan plan = planTransition(*ct, m_curPts, *t, m_nextPts, m_beats, m_nextSynced);
+        if (plan.outStart > cur->position() + 0.5) {        // aún da tiempo de mezclar ahí
+            m_curPts.mixOut = plan.outStart;
+            m_curPts.transition = plan.length;
+            m_nextPts.mixIn = plan.inStart;
+        }
+        m_planText = !m_nextSynced ? QStringLiteral("fundido · tempos distintos")
+                   : plan.structural ? plan.describe
+                   : QStringLiteral("%1 beats").arg(plan.beats);
+    }
+    o->seekSeconds(m_nextPts.mixIn);
     m_nextReady = true;
     m_nextTitle = o->artist().isEmpty() ? o->title() : o->artist() + QStringLiteral(" — ") + o->title();
-    if (m_repeat) m_played << m_nextPath;
+    if (m_repeat && (m_played.isEmpty() || m_played.last() != m_nextPath)) m_played << m_nextPath;
     emit stateChanged();
 }
 
@@ -410,7 +425,7 @@ void AutomixController::beginMix(bool now) {
     if (m_eqTouched) o->setEqLow(-1.0);
 
     double len = m_curPts.transition;
-    if (now) len = t && t->bpm > 0 ? m_beats * 60.0 / t->bpm : 8.0;
+    if (now) len = t && t->bpm > 0 ? (m_beats > 0 ? m_beats : 16) * 60.0 / t->bpm : 8.0;
     const double t0 = t ? t->durationSec() : pos;
     len = std::min(len, std::max(0.0, t0 - pos));   // nunca más allá del final
     m_mixStartPos = pos;
@@ -461,6 +476,7 @@ void AutomixController::finishMix() {
     m_nextPath.clear();
     m_nextReady = m_nextSynced = false;
     m_nextTitle.clear();
+    m_planText.clear();
     m_progress = 1.0;
     m_state = State::Playing;
     emit progressChanged();

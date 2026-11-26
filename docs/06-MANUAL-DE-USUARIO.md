@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.7.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.8.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -24,6 +24,12 @@
 | **Vista general** | Clic o arrastre para ir a cualquier parte de la pista |
 
 Las **formas de onda grandes** (arriba) muestran graves en magenta, medios en oro y agudos en cian, con líneas de beat (más brillantes cada compás), cues y loops. Arrástralas para hacer scratch fino; la rueda del ratón cambia el zoom.
+
+### Secciones de la pista (estructura)
+Al cargar una pista con BPM, Jocker-MX reconoce sus partes por compases y las dibuja como una franja de colores debajo de la vista general:
+**Intro** (cian), **Cuerpo** (azul), **Break** (verde), **Drop** (rosa) y **Outro** (oro). El nombre de la sección que suena aparece junto al indicador de beats.
+- **Clic en un color** salta al inicio de esa sección. Si la pista está sonando y la cuantización (**Q**) está activa, conserva la posición dentro del compás, así que no pierdes el ritmo.
+- La detección se basa en la energía y en los graves de cada compás, así que funciona mejor con música electrónica, pop y urbana de estructura marcada. Si el beatgrid está mal, las secciones también; corrígelo y se recalculan al instante.
 
 ### Tonalidad y mezcla armónica
 Junto al BPM aparece la **tonalidad** en notación Camelot (por ejemplo **8A** = La menor). Si una pista ya trae la tonalidad en sus etiquetas («Am», «F#m», «1m», «8A»…), se usa esa; si no, Jocker-MX la detecta al analizarla. El recuadro se pone **verde** cuando combina con la pista del otro deck: misma clave, ±1 en la rueda (8A ↔ 7A/9A) o su relativa (8A ↔ 8B). En la biblioteca, la columna TONO se pone en verde para las pistas que combinan con lo que está sonando.
@@ -97,7 +103,7 @@ El Automix toca y mezcla solo la música de su **cola**, usando los decks A y B 
    - la salida empieza **al inicio de un compás** y la entrada en el primer beat;
    - si los BPM son compatibles (±8 %, o medio/doble tiempo) **iguala tempo y fase**, cruza el crossfader e **intercambia los graves** a mitad de la mezcla para que no choquen los bajos;
    - si no son compatibles, hace un **fundido** sin sincronizar.
-4. **Duración de la mezcla**: 4, 8, 16 o 32 beats (en pistas cortas se acorta sola). **⏩ Mezclar ya** (o `Ctrl+Intro`) mezcla en el siguiente compás; **Saltar** descarta la pista preparada y prepara la siguiente.
+4. **Duración de la mezcla**: **AUTO** (recomendado) usa la estructura: empieza en la **outro** de la pista que sale y arranca la nueva en el punto exacto de su **intro** para que su cuerpo o drop entre justo cuando la anterior termina (hasta 16 compases). Si alguna pista no tiene intro/outro clara, o los tempos no son compatibles, usa el punto fijo. También puedes fijar 8, 16 o 32 beats. Bajo la pista que sigue verás cómo será la mezcla (p. ej. «outro → intro · 8 compases»). **⏩ Mezclar ya** (o `Ctrl+Intro`) mezcla en el siguiente compás; **Saltar** descarta la pista preparada y prepara la siguiente.
 5. Opciones: **Intercambiar graves**, **Volver al tempo original** (tras una mezcla sincronizada, la pista regresa poco a poco a su tempo, ≈1 % cada 10 s) y **Repetir la cola**.
 - En la barra superior, **AUTO** muestra cuánto falta para la siguiente mezcla. Puedes tocar los decks, efectos y sampler mientras el Automix trabaja; si pausas el deck que suena, el Automix espera.
 - **💾 Guardar lista** guarda la cola como lista de reproducción. La cola se recuerda al cerrar la app.
@@ -144,4 +150,4 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 10. Próximamente
-Más efectos, guardar stems en disco, detección de estructura (intro/estribillo/outro) para el Automix, video y karaoke, transmisión en vivo e interfaz táctil para teléfono. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Más efectos, guardar stems en disco, estilos de transición del Automix (eco, filtro, corte), video y karaoke, transmisión en vivo e interfaz táctil para teléfono. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

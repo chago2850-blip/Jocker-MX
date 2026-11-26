@@ -10,6 +10,7 @@
 #include "app/Mixer.h"
 #include "app/AutomixController.h"
 #include "app/AutomixPlan.h"
+#include "analysis/Structure.h"
 #include "app/RecordingController.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
@@ -81,6 +82,60 @@ static void writeTestWav(const QString& path, double bpm, double firstBeat, doub
     for (int i = 0; i < n; ++i) {
         w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(l[i], -1.f, 1.f) * 32000)));
         w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(r[i], -1.f, 1.f) * 32000)));
+    }
+}
+
+
+// Pista con estructura conocida: cada parte dice cuántos compases dura y qué instrumentos suenan.
+struct Part { int bars; bool kick, bass, hat; };
+static void writeStructuredWav(const QString& path, double bpm, double firstBeat, const std::vector<Part>& parts, int sr = 44100) {
+    const double beat = 60.0 / bpm;
+    int totalBars = 0; for (const Part& p : parts) totalBars += p.bars;
+    const double secs = firstBeat + totalBars * 4 * beat + 1.0;
+    const int n = static_cast<int>(secs * sr);
+    std::vector<float> l(n, 0.f), r(n, 0.f);
+    std::mt19937 rng(7);
+    std::normal_distribution<float> noise(0.f, 1.f);
+    int k = 0;
+    for (const Part& part : parts) {
+        for (int b = 0; b < part.bars * 4; ++b, ++k) {
+            const double tb = firstBeat + k * beat;
+            const int s = static_cast<int>(tb * sr);
+            if (part.kick) {
+                double ph = 0;
+                for (int i = 0; i < sr / 4 && s + i < n; ++i) {
+                    const double t = static_cast<double>(i) / sr;
+                    ph += 2 * M_PI * (50 + 120 * std::exp(-t * 25)) / sr;
+                    const float v = static_cast<float>(std::sin(ph) * std::exp(-t * 9) * 0.7);
+                    l[s + i] += v; r[s + i] += v;
+                }
+            }
+            if (part.hat) {
+                const int h = static_cast<int>((tb + beat / 2) * sr);
+                float prev = 0;
+                for (int i = 0; i < sr / 20 && h + i < n; ++i) {
+                    const float x = noise(rng) * 0.2f * static_cast<float>(std::exp(-i / (double)sr * 80));
+                    l[h + i] += x - prev; r[h + i] += (x - prev) * 0.8f; prev = x;
+                }
+            }
+            if (part.bass) {     // bajo sostenido durante todo el beat
+                for (int i = 0; i < static_cast<int>(beat * sr) && s + i < n; ++i) {
+                    const double t = static_cast<double>(i) / sr;
+                    const float v = static_cast<float>(std::sin(2 * M_PI * 55 * t) * 0.35);
+                    l[s + i] += v; r[s + i] += v;
+                }
+            }
+        }
+    }
+    QFile f(path);
+    f.open(QIODevice::WriteOnly);
+    auto w32 = [&](uint32_t v) { f.write(reinterpret_cast<const char*>(&v), 4); };
+    auto w16 = [&](uint16_t v) { f.write(reinterpret_cast<const char*>(&v), 2); };
+    f.write("RIFF"); w32(36 + n * 4); f.write("WAVEfmt "); w32(16); w16(1); w16(2); w32(sr); w32(sr * 4); w16(4); w16(16);
+    f.write("data"); w32(n * 4);
+    for (int i = 0; i < n; ++i) {
+        w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(l[i], -1.f, 1.f) * 30000)));
+        w16(static_cast<uint16_t>(static_cast<int16_t>(std::clamp(r[i], -1.f, 1.f) * 30000)));
     }
 }
 
@@ -686,6 +741,102 @@ int main(int argc, char** argv) {
         CHECK(endedOk && am.queue().count() == 0, "la cola se reprodujo completa (%.0f s simulados)", simT);
         am.setEnabled(false);
         a.pause(); b.pause();
+    }
+
+
+    std::printf("\n[17] Estructura de la pista\n");
+    {
+        // intro (bombo+hats) 16 · cuerpo (todo) 32 · break (hats) 8 · drop (todo) 16 · outro (bombo+hats) 16 compases
+        const std::vector<Part> song = {{16, true, false, true}, {32, true, true, true}, {8, false, false, true},
+                                        {16, true, true, true}, {16, true, false, true}};
+        const QString sp = tmp.filePath("estructura.wav");
+        writeStructuredWav(sp, 126, 0.25, song);
+        QString err;
+        auto st = jx::loadAndAnalyze(sp, sr, &err);
+        CHECK(st && std::abs(st->bpm - 126) < 0.2, "pista estructurada analizada (%.2f BPM)", st ? st->bpm : 0.0);
+        if (st) {
+            const auto secs = jx::analyzeStructure(*st);
+            QStringList names;
+            for (const auto& x : secs) names << QStringLiteral("%1(%2)").arg(jx::Section::name(x.kind)).arg(x.bars);
+            const bool kindsOk = secs.size() == 5 && secs[0].kind == jx::Section::Intro && secs[1].kind == jx::Section::Body &&
+                                 secs[2].kind == jx::Section::Break && secs[3].kind == jx::Section::Drop && secs[4].kind == jx::Section::Outro;
+            CHECK(kindsOk, "secciones detectadas: %s", qPrintable(names.join(" · ")));
+            if (kindsOk) {
+                const double bar = 4 * 60.0 / st->bpm;
+                const int expect[] = {16, 48, 56, 72};
+                double worst = 0;
+                for (int i = 0; i < 4; ++i) worst = std::max(worst, std::abs(secs[i + 1].start - (0.25 + expect[i] * bar)));
+                CHECK(worst < 0.05, "límites en el compás exacto (error máx. %.0f ms)", worst * 1000);
+            }
+            // Una pista sin cambios no se inventa secciones
+            auto flat = jx::loadAndAnalyze(tmp.filePath("t128.wav"), sr, &err);
+            const auto fs = flat ? jx::analyzeStructure(*flat) : std::vector<jx::Section>{};
+            CHECK(fs.size() == 1 && fs[0].kind == jx::Section::Body, "pista uniforme: una sola sección (%d)", int(fs.size()));
+
+            // Plan de transición: outro de A (16 compases) sobre intro de B (16 compases) → el cuerpo de B entra al acabar A.
+            const QString sp2 = tmp.filePath("estructura2.wav");
+            writeStructuredWav(sp2, 124, 0.4, {{8, true, false, true}, {24, true, true, true}, {8, true, false, true}});
+            auto st2 = jx::loadAndAnalyze(sp2, sr, &err);
+            if (st2) {
+                const jx::MixPoints po = jx::computeMixPoints(*st, 0), pi = jx::computeMixPoints(*st2, 0);
+                const auto s2 = jx::analyzeStructure(*st2);
+                const jx::TransitionPlan plan = jx::planTransition(*st, po, *st2, pi, 0, true);
+                const double introEnd2 = s2.empty() ? -1 : s2[0].end;
+                const double outroEnd = secs.back().start + 16 * 4 * 60.0 / st->bpm;
+                CHECK(plan.structural && plan.beats == 32, "mezcla por estructura de %d beats (%s)", plan.beats, qPrintable(plan.describe));
+                CHECK(std::abs(plan.outStart + plan.length - outroEnd) < 0.05, "la mezcla termina al final de la outro");
+                CHECK(std::abs(plan.inStart + plan.beats * 60.0 / st2->bpm - introEnd2) < 0.05,
+                      "el cuerpo de la nueva entra justo al terminar la mezcla");
+                const jx::TransitionPlan fixed = jx::planTransition(*st, po, *st2, pi, 8, true);
+                CHECK(!fixed.structural, "con duración fija se respetan los puntos fijos");
+                const jx::TransitionPlan unsynced = jx::planTransition(*st, po, *st2, pi, 0, false);
+                CHECK(!unsynced.structural, "sin sincronía no se usa la estructura");
+
+                // De extremo a extremo con el Automix en modo automático
+                if (a.playing()) a.pause();
+                if (b.playing()) b.pause();
+                jx::Mixer mx2(&eng, {&a, &b});
+                mx2.setCrossfader(-1);
+                jx::AutomixController am2(&a, &b, &mx2);
+                am2.clear();
+                am2.setTransitionBeats(0);
+                am2.setTempoReturn(false);
+                am2.setRepeat(false);
+                am2.add({sp, sp2});
+                am2.setEnabled(true);
+                bool jumped = false, wasMixing = false;
+                double startPos = -1, bAtEnd = -1;
+                QString planTxt;
+                QElapsedTimer wall; wall.start();
+                for (double sim = 0; sim < 60 && wall.elapsed() < 120000;) {
+                    QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
+                    if (a.loading() || b.loading()) { QCoreApplication::processEvents(QEventLoop::AllEvents, 20); continue; }
+                    am2.step();
+                    if (!jumped && am2.activeDeck() == 0 && !am2.planText().isEmpty() && a.playing()) {
+                        planTxt = am2.planText();
+                        a.seekSeconds(plan.outStart - 4.0);      // adelantar hasta poco antes de la mezcla
+                        jumped = true;
+                    }
+                    renderSecs(0.025);
+                    sim += 0.025;
+                    if (am2.mixing() && !wasMixing) startPos = a.position();
+                    if (!am2.mixing() && wasMixing) { bAtEnd = b.position(); break; }
+                    wasMixing = am2.mixing();
+                }
+                am2.setEnabled(false);
+                a.pause(); b.pause();
+                CHECK(planTxt.startsWith("outro"), "el Automix anuncia la mezcla «%s»", qPrintable(planTxt));
+                CHECK(std::abs(startPos - plan.outStart) < 0.1, "empieza en la outro planeada (%.2f s, previsto %.2f s)", startPos, plan.outStart);
+                CHECK(std::abs(bAtEnd - introEnd2) < 0.15, "al terminar, la nueva está en su cuerpo (%.2f s, previsto %.2f s)", bAtEnd, introEnd2);
+            }
+            // El deck expone las secciones a la interfaz y salta a ellas
+            a.load(sp);
+            CHECK(waitLoaded(a) && a.sections().size() == 5, "el deck publica %d secciones", int(a.sections().size()));
+            a.jumpToSection(3);
+            renderSecs(0.05);
+            a.tick();
+            CHECK(a.sectionIndex() == 3, "saltar al drop (sección %d)", a.sectionIndex());
+        }
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

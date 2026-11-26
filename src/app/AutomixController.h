@@ -66,6 +66,7 @@ class AutomixController : public QObject {
     Q_PROPERTY(QString status READ status NOTIFY stateChanged)
     Q_PROPERTY(QString nextTitle READ nextTitle NOTIFY stateChanged)
     Q_PROPERTY(bool nextSynced READ nextSynced NOTIFY stateChanged)
+    Q_PROPERTY(QString planText READ planText NOTIFY stateChanged)       // cómo será la próxima mezcla
     Q_PROPERTY(double queueSeconds READ queueSeconds NOTIFY queueChanged)
 
 public:
@@ -91,6 +92,7 @@ public:
     QString status() const { return m_status; }
     QString nextTitle() const { return m_nextTitle; }
     bool nextSynced() const { return m_nextSynced; }
+    QString planText() const { return m_planText; }
     double queueSeconds() const { return m_queue.totalDuration(); }
 
     Q_INVOKABLE void toggle() { setEnabled(!m_enabled); }
@@ -132,7 +134,7 @@ private:
     QTimer m_timer;
 
     bool m_enabled = false;
-    int m_beats = 16;
+    int m_beats = 0;                    // 0 = automático por estructura
     bool m_bassSwap = true, m_tempoReturn = true, m_repeat = false;
     QStringList m_played;               // para el modo repetir
 
@@ -151,7 +153,7 @@ private:
     bool m_eqTouched = false;
 
     double m_progress = 0, m_secondsToMix = -1;
-    QString m_status, m_nextTitle;
+    QString m_status, m_nextTitle, m_planText;
 };
 
 } // namespace jx

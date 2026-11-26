@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include "analysis/Structure.h"
+
 #include "engine/AudioEngine.h"
 #include "stems/StemsService.h"
 
@@ -71,6 +73,8 @@ class DeckController : public QObject {
     Q_PROPERTY(double stemsProgress READ stemsProgress NOTIFY stemsProgressChanged)
     Q_PROPERTY(QString stemsError READ stemsError NOTIFY stemsChanged)
     Q_PROPERTY(QVariantList stemOn READ stemOn NOTIFY stemsChanged)
+    Q_PROPERTY(QVariantList sections READ sections NOTIFY sectionsChanged)   // [{start, end, kind, name, bars}]
+    Q_PROPERTY(int sectionIndex READ sectionIndex NOTIFY sectionIndexChanged)
 
 public:
     DeckController(AudioEngine* engine, int index, QObject* parent = nullptr);
@@ -161,6 +165,10 @@ public:
     Q_INVOKABLE void sync();
     Q_INVOKABLE void seekFraction(double f);
     Q_INVOKABLE void seekSeconds(double s);
+    Q_INVOKABLE void jumpToSection(int i);   // salta al inicio de la sección (respeta el compás si suena)
+    QVariantList sections() const { return m_sectionsVar; }
+    int sectionIndex() const { return m_sectionIndex; }
+    const std::vector<Section>& sectionList() const { return m_sections; }
     Q_INVOKABLE void play();               // reproducir (no alterna)
     Q_INVOKABLE void pause();              // pausar sin volver al cue
     Q_INVOKABLE void matchTempo();         // sólo tempo, sin mover la fase
@@ -203,6 +211,8 @@ signals:
     void fxChanged();
     void stemsChanged();
     void stemsProgressChanged();
+    void sectionsChanged();
+    void sectionIndexChanged();
     void trackLoaded(const QString& path, double bpm, const QString& key);
     void played(const QString& path);
 
@@ -242,6 +252,10 @@ private:
     double m_level = 0;
 
     void applyStemGains();
+    void updateSections();
+    std::vector<Section> m_sections;
+    QVariantList m_sectionsVar;
+    int m_sectionIndex = -1;
     std::shared_ptr<StemData> m_stems;
     std::shared_ptr<StemsService::Job> m_stemJob;
     int m_stemsState = 0;

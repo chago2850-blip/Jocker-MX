@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "AutomixPlan.h"
 
+#include "analysis/Structure.h"
 #include "engine/Track.h"
 
 #include <algorithm>
@@ -29,6 +30,7 @@ bool tempoCompatible(double bpmA, double bpmB, double maxStretch) {
 }
 
 MixPoints computeMixPoints(const Track& t, int transitionBeats, double fallbackSeconds) {
+    if (transitionBeats <= 0) transitionBeats = 16;   // modo automático: punto fijo de respaldo
     MixPoints m;
     const double sr = t.sampleRate > 0 ? t.sampleRate : 48000.0;
     const double dur = t.frames / sr;
@@ -76,6 +78,65 @@ MixPoints computeMixPoints(const Track& t, int transitionBeats, double fallbackS
         m.mixOut = std::max(m.mixIn, m.lastAudible - m.transition);
     }
     return m;
+}
+
+TransitionPlan planTransition(const Track& out, const MixPoints& outPts, const Track& in, const MixPoints& inPts,
+                              int beats, bool synced) {
+    TransitionPlan p;
+    p.outStart = outPts.mixOut;
+    p.inStart = inPts.mixIn;
+    p.length = outPts.transition;
+    p.beats = out.bpm > 0 ? int(std::lround(outPts.transition * out.bpm / 60.0)) : 0;
+    if (beats > 0 || !synced || out.bpm <= 0 || in.bpm <= 0) return p;
+
+    const std::vector<Section> so = analyzeStructure(out), si = analyzeStructure(in);
+    const double bo = 60.0 / out.bpm, bi = 60.0 / in.bpm;
+    auto phraseFloor = [](double b) { return std::floor(b / 16.0 + 1e-6) * 16.0; };   // múltiplo de 4 compases
+
+    // Outro de la que sale (sólo si es la última sección) hasta su último sonido.
+    double outroBeats = 0, outroEnd = 0, outroStart = 0;
+    if (!so.empty() && so.back().kind == Section::Outro) {
+        outroStart = so.back().start;
+        // +1 beat de tolerancia: el último golpe de la outro suena menos de un beat completo.
+        outroBeats = phraseFloor((std::min(so.back().end, outPts.lastAudible + 0.05) - outroStart) / bo + 1.0);
+        outroBeats = std::min(outroBeats, std::floor((so.back().end - outroStart) / bo + 1e-6));
+        outroEnd = outroStart + outroBeats * bo;
+    }
+    // Intro de la que entra (desde su primer beat audible hasta que empieza el cuerpo).
+    double introBeats = 0, introEnd = 0;
+    if (!si.empty() && si.front().kind == Section::Intro && si.size() > 1) {
+        introEnd = si.front().end;
+        introBeats = phraseFloor((introEnd - inPts.mixIn) / bi);
+    }
+
+    double L = 0, oStart = 0, iStart = 0;
+    if (outroBeats >= 16 && introBeats >= 16) {
+        L = std::min({outroBeats, introBeats, 64.0});
+        oStart = outroEnd - L * bo;
+        iStart = introEnd - L * bi;
+        p.describe = QStringLiteral("outro → intro · %1 compases").arg(int(L / 4));
+    } else if (outroBeats >= 16) {
+        L = std::min(outroBeats, 32.0);
+        oStart = outroStart;
+        iStart = inPts.mixIn;
+        p.describe = QStringLiteral("sobre la outro · %1 compases").arg(int(L / 4));
+    } else if (introBeats >= 16) {
+        L = std::min(introBeats, 32.0);
+        const double fb = out.firstBeat / out.sampleRate, bar = 4 * bo;
+        const double endBar = std::min(out.frames / out.sampleRate, fb + std::floor((outPts.lastAudible - fb) / bar + 0.25) * bar);
+        oStart = endBar - L * bo;
+        iStart = introEnd - L * bi;
+        p.describe = QStringLiteral("intro completa · %1 compases").arg(int(L / 4));
+    } else {
+        return p;
+    }
+    if (oStart < outPts.mixIn + 4 * bo || iStart < 0) return p;   // pista demasiado corta: puntos fijos
+    p.outStart = oStart;
+    p.inStart = iStart;
+    p.length = L * bo;
+    p.beats = int(L);
+    p.structural = true;
+    return p;
 }
 
 } // namespace jx

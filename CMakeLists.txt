@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.7.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.7.0-dev")
+project(JockerMX VERSION 0.8.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.8.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -89,7 +89,7 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/engine/Sampler.h src/engine/Sampler.cpp
   src/engine/Recorder.h src/engine/Recorder.cpp
   src/analysis/Analyzer.h src/analysis/Analyzer.cpp
-  src/analysis/KeyDetector.h src/analysis/KeyDetector.cpp
+  src/analysis/KeyDetector.h src/analysis/KeyDetector.cpp src/analysis/Structure.cpp
   src/analysis/PlatformDecoder.h src/analysis/PlatformDecoder.cpp
   src/library/TagReader.h src/library/TagReader.cpp
   src/library/LibraryDb.h src/library/LibraryDb.cpp
@@ -284,7 +284,7 @@ if(JOCKER_BUILD_TESTS)
   add_executable(jx-tests
     tests/engine_tests.cpp
     src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
-    src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/PlatformDecoder.cpp
+    src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/Structure.cpp src/analysis/PlatformDecoder.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp

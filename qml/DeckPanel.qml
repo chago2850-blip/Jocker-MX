@@ -103,7 +103,16 @@ Rectangle {
             Layout.fillWidth: true
             Text { text: Theme.formatTime(root.deck.position); color: Theme.text; font.pixelSize: 13; font.family: "monospace" }
             Item { Layout.fillWidth: true
+                Text {     // sección actual (intro, cuerpo, break, drop, outro)
+                    readonly property var sec: root.deck.sectionIndex >= 0 ? root.deck.sections[root.deck.sectionIndex] : null
+                    visible: sec !== null && root.deck.sections.length > 1
+                    anchors.right: beatRow.left; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
+                    text: sec ? sec.name.toUpperCase() : ""
+                    color: sec ? Theme.sectionColor(sec.kind) : Theme.faint
+                    font.pixelSize: 10; font.weight: Font.Black; font.letterSpacing: 1
+                }
                 Row {
+                    id: beatRow
                     anchors.centerIn: parent
                     spacing: 5
                     Repeater {
@@ -129,6 +138,7 @@ Rectangle {
             border.color: Theme.border
             WaveformItem {
                 anchors.fill: parent; anchors.margins: 2
+                anchors.bottomMargin: root.deck.sections.length > 1 ? 9 : 2
                 deck: root.deck
                 accent: root.accent
             }
@@ -136,6 +146,28 @@ Rectangle {
                 anchors.fill: parent
                 onPressed: function(m) { root.deck.seekFraction(m.x / width) }
                 onPositionChanged: function(m) { if (pressed) root.deck.seekFraction(m.x / width) }
+            }
+            Item {     // franja de secciones: clic = saltar a esa sección (respetando el compás)
+                id: secStrip
+                visible: root.deck.sections.length > 1 && root.deck.duration > 0
+                anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
+                anchors.margins: 2
+                height: 6
+                Repeater {
+                    model: root.deck.sections
+                    Rectangle {
+                        x: secStrip.width * modelData.start / root.deck.duration + 1
+                        width: Math.max(2, secStrip.width * (modelData.end - modelData.start) / root.deck.duration - 2)
+                        height: secStrip.height; radius: 2
+                        color: Theme.sectionColor(modelData.kind)
+                        opacity: root.deck.sectionIndex === index ? 1.0 : 0.55
+                        MouseArea {
+                            anchors.fill: parent; anchors.topMargin: -4
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.deck.jumpToSection(index)
+                        }
+                    }
+                }
             }
         }
 

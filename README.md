@@ -10,13 +10,14 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.7.0-dev (alfa).** Nuevo: **Automix** (mezcla automática sincronizada con cola de reproducción) y **listas de reproducción**. Funcionan **stems con IA**, 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-070-dev).
+> **Estado: 0.8.0-dev (alfa).** Nuevo: **detección de estructura** (intro, cuerpo, break, drop y outro) y **Automix inteligente** que mezcla la outro de una pista con la intro de la siguiente. Ya estaban el **Automix** y las **listas de reproducción**. Funcionan **stems con IA**, 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-080-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-sampler.png" alt="Sampler de Jocker-MX" width="49%"> <img src="assets/screenshots/jocker-mx-midi.png" alt="Controladores MIDI" width="49%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-automix.png" alt="Automix de Jocker-MX mezclando" width="100%"></p>
+<p align="center"><img src="assets/screenshots/jocker-mx-estructura.png" alt="Secciones de cada pista y Automix por estructura" width="100%"></p>
 
-## Lo que ya funciona en 0.7.0-dev
+## Lo que ya funciona en 0.8.0-dev
 - **2 decks** con carga de **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
@@ -30,6 +31,8 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Búsqueda** sin acentos ni mayúsculas («cancion» encuentra «Canción») y filtros `bpm:120-128` y `key:8A`.
 - **Beatgrid editable**: ½, ×2, TAP, mover la rejilla ±10 ms y «beat aquí»; se guarda por pista junto con cue y hot cues.
 - **Automix**: cola de reproducción que se mezcla sola entre los decks A y B. Salta los silencios, sale al inicio de un compás, **sincroniza tempo y fase** cuando los BPM son compatibles (±8 %, también medio/doble tiempo), cruza el crossfader e **intercambia los graves** a mitad de la mezcla; si no son compatibles hace un fundido. Mezcla de 4/8/16/32 beats, **Mezclar ya** (en el siguiente compás), saltar, repetir la cola, regreso suave al tempo original y cuenta regresiva en la barra superior.
+- **Estructura de cada pista**: detecta **intro, cuerpo, break, drop y outro** por compases; se ve como una franja de colores bajo la forma de onda (clic = saltar a esa sección sin perder el compás) y el nombre de la sección actual junto al indicador de beats.
+- **Automix AUTO**: con la estructura, mezcla la **outro** de la pista que sale con la **intro** de la que entra, calculando la duración para que el cuerpo de la nueva entre justo cuando la anterior termina.
 - **Listas de reproducción** en la biblioteca: crear, renombrar, reordenar, buscar dentro, arrastrar pistas sobre una lista, mandarlas al Automix o guardar la cola como lista.
 - **Stems con IA**: separa cada pista en **voz, batería, bajo y melodía** en segundo plano al cargarla; botones por stem, **ACAPELLA** e **INSTRUMENTAL**, todo sin cortes y compatible con key lock, scratch, loops y efectos. Usa el modelo libre Spleeter 4 stems (Deezer, MIT) con un **motor de inferencia propio en C++** (sin servicios en la nube ni runtimes externos).
 - **Tonalidad automática** con notación **Camelot** (y Open Key): se muestra en cada deck y en la biblioteca, en **verde** cuando combina armónicamente con lo que está sonando.

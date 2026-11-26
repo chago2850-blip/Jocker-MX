@@ -22,6 +22,8 @@ QtObject {
     readonly property var hotColors: ["#ff4646", "#ffa028", "#fae63c", "#50e678", "#3cc8ff", "#5a6eff", "#be5aff", "#ff5ac8"]
 
     function deckColor(i) { return i === 0 ? magenta : cyan }
+    // Colores de las secciones: intro, cuerpo, break, drop, outro
+    function sectionColor(k) { return ["#3fe0ff", "#6b7bff", "#55e08a", "#ff2d8c", "#f5b942"][k] || faint }
 
     function formatTime(sec) {
         if (sec < 0 || isNaN(sec)) sec = 0

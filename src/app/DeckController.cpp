@@ -130,6 +130,7 @@ void DeckController::load(const QString& pathOrUrl) {
         emit loopChanged();
         emit tempoChanged();
         emit trackLoaded(m_track->path, m_track->bpm, m_track->musicalKey);
+        updateSections();
         emit stemsChanged();
         if (stemsAvailable() && QSettings().value("stems/auto", true).toBool()) prepareStems();
     });
@@ -152,6 +153,7 @@ void DeckController::eject() {
     m_deck.setTrack(nullptr);
     m_track.reset();
     if (old || oldStems) QTimer::singleShot(2000, this, [old, oldStems]() {});
+    updateSections();
     emit stemsChanged();
     emit trackChanged();
 }
@@ -187,6 +189,7 @@ void DeckController::setGrid(double bpm, double firstBeat) {
     emit tempoChanged();
     emit trackChanged();
     emit trackLoaded(m_track->path, m_track->bpm, m_track->musicalKey);
+    updateSections();
 }
 void DeckController::bpmDouble() { if (m_track && m_track->bpm > 0) setGrid(m_track->bpm * 2, m_track->firstBeat); }
 void DeckController::bpmHalve() { if (m_track && m_track->bpm > 0) setGrid(m_track->bpm / 2, m_track->firstBeat); }
@@ -270,6 +273,33 @@ void DeckController::seekSeconds(double sec) {
     if (!m_track) return;
     m_deck.reachedEnd.store(false);
     m_deck.requestSeek(std::clamp(sec * m_track->sampleRate, 0.0, static_cast<double>(m_track->frames)));
+}
+
+void DeckController::updateSections() {
+    m_sections = m_track ? analyzeStructure(*m_track) : std::vector<Section>{};
+    m_sectionsVar.clear();
+    for (const Section& s : m_sections)
+        m_sectionsVar << QVariantMap{{"start", s.start}, {"end", s.end}, {"kind", int(s.kind)},
+                                     {"name", Section::name(s.kind)}, {"bars", s.bars}};
+    m_sectionIndex = -1;
+    emit sectionsChanged();
+    emit sectionIndexChanged();
+}
+
+void DeckController::jumpToSection(int i) {
+    if (!m_track || i < 0 || i >= int(m_sections.size())) return;
+    double target = m_sections[i].start * m_track->sampleRate;
+    if (playing() && m_quantize && m_track->bpm > 0) {
+        // Mantener la posición dentro del compás para no perder el ritmo.
+        const double bar = 4 * m_track->beatLength();
+        double ph = std::fmod(m_deck.position.load() - m_track->firstBeat, bar);
+        if (ph < 0) ph += bar;
+        double t0 = std::fmod(target - m_track->firstBeat, bar);
+        if (t0 < 0) t0 += bar;
+        target = target - t0 + ph;
+    }
+    m_deck.reachedEnd.store(false);
+    m_deck.requestSeek(std::clamp(target, 0.0, static_cast<double>(m_track->frames)));
 }
 
 void DeckController::play() {
@@ -567,7 +597,17 @@ void DeckController::tick() {
         if (std::abs(p - m_stemsProgress) > 0.005) { m_stemsProgress = p; emit stemsProgressChanged(); }
     }
     const double pos = m_deck.position.load();
-    if (pos != m_lastPos) { m_lastPos = pos; emit positionChanged(); }
+    if (pos != m_lastPos) {
+        m_lastPos = pos;
+        emit positionChanged();
+        if (m_track && !m_sections.empty()) {
+            const double s = pos / m_track->sampleRate;
+            int idx = -1;
+            for (int i = 0; i < int(m_sections.size()); ++i)
+                if (s >= m_sections[i].start && s < m_sections[i].end) { idx = i; break; }
+            if (idx != m_sectionIndex) { m_sectionIndex = idx; emit sectionIndexChanged(); }
+        }
+    }
     const bool pl = m_deck.playing.load();
     if (pl != m_lastPlaying) { m_lastPlaying = pl; emit playingChanged(); }
 

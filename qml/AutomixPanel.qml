@@ -93,7 +93,7 @@ Rectangle {
                             Text {
                                 visible: automix.nextTitle.length > 0
                                 text: "⏭  " + (automix.activeDeck === 1 ? "A" : "B") + " · " + automix.nextTitle +
-                                      (automix.nextSynced ? "   (sincronizada)" : "   (fundido sin sincronizar)")
+                                      (automix.planText.length ? "   ·  " + automix.planText : "")
                                 color: Theme.dim; font.pixelSize: 12
                             }
                         }
@@ -197,8 +197,8 @@ Rectangle {
             Row {
                 spacing: 4
                 Repeater {
-                    model: [4, 8, 16, 32]
-                    JxButton { width: 54; height: 26; fontSize: 11; text: modelData + " b"; accent: Theme.cyan
+                    model: [0, 8, 16, 32]
+                    JxButton { width: 54; height: 26; fontSize: 11; text: modelData === 0 ? "AUTO" : modelData + " b"; accent: Theme.cyan
                                active: automix.transitionBeats === modelData; onClicked: automix.transitionBeats = modelData }
                 }
             }
@@ -229,7 +229,7 @@ Rectangle {
             Text {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: "Salta los silencios, sale al inicio de un compás y sincroniza tempo y fase si los BPM son compatibles (±8 %). Ctrl+M enciende/apaga · Ctrl+Intro mezcla ya."
+                text: "AUTO mezcla la outro de una pista con la intro de la siguiente para que su cuerpo entre justo al terminar. Sincroniza tempo y fase si los BPM son compatibles (±8 %). Ctrl+M enciende/apaga · Ctrl+Intro mezcla ya."
                 color: Theme.faint; font.pixelSize: 10
             }
         }

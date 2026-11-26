@@ -13,9 +13,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Sql)
-if(ANDROID)
-  find_package(Qt6 REQUIRED COMPONENTS CorePrivate)
-endif()
 qt_standard_project_setup()
 
 # --- Terceros ---------------------------------------------------------------

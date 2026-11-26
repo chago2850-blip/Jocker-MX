@@ -32,7 +32,7 @@ Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-
 
 | Sistema | Archivo |
 |---|---|
-| macOS 12+ (Apple Silicon e Intel) | `.dmg` — la primera vez: clic derecho → *Abrir* (aún sin firma de Apple) |
+| macOS 12+ (Apple Silicon e Intel) | `.dmg` — arrastra la app a Aplicaciones; la primera vez: *Ajustes del Sistema → Privacidad y seguridad → Abrir de todos modos* (aún sin notarizar) |
 | Windows 10/11 | instalador `.exe` o `.zip` portátil |
 | Ubuntu 24.04+ / Debian 13+ | `.deb` → `sudo apt install ./jocker-mx_*.deb` |
 | Fedora 40+ | `.rpm` → `sudo dnf install ./jocker-mx-*.rpm` |

@@ -47,7 +47,7 @@ Las **formas de onda grandes** (arriba) muestran graves en magenta, medios en or
 ## 5. Solución de problemas
 - **"Sin dispositivo de audio"**: el sistema no encontró tarjeta de sonido; la interfaz funciona pero en silencio. Conecta una salida de audio y reinicia la app.
 - **Una pista no carga**: en esta versión sólo se leen MP3, WAV y FLAC. Otros formatos (AAC/M4A, OGG, video) llegarán con el decodificador FFmpeg.
-- **macOS dice que no puede abrir la app**: clic derecho sobre Jocker-MX → *Abrir* → *Abrir* (la app aún no está firmada por Apple).
+- **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 6. Próximamente
 Controladores MIDI, efectos, sampler, stems con IA, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

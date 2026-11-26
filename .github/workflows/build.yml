@@ -108,6 +108,6 @@ jobs:
             ## Jocker-MX ${{ github.ref_name }}
             Instaladores:
             - **Windows**: `jocker-mx-…-Windows.exe` (instalador) o `.zip` (portátil)
-            - **macOS** (Apple Silicon e Intel): `.dmg` — la primera vez: clic derecho sobre la app → *Abrir* (aún no está firmada)
+            - **macOS** (Apple Silicon e Intel): `.dmg` — arrastra Jocker-MX a Aplicaciones. Como aún no está notarizada por Apple, la primera vez ábrela y luego ve a *Ajustes del Sistema → Privacidad y seguridad → Abrir de todos modos*
             - **Linux**: `.deb` (Ubuntu 24.04+, Debian 13+) o `.rpm` (Fedora)
             - **Android**: en desarrollo (fase F11)

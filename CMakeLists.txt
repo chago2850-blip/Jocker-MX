@@ -92,6 +92,7 @@ set_target_properties(jocker-mx PROPERTIES
   MACOSX_BUNDLE_ICON_FILE "jocker-mx.icns")
 
 if(APPLE)
+  set_target_properties(jocker-mx PROPERTIES OUTPUT_NAME "Jocker-MX")
   set(APP_ICNS ${CMAKE_SOURCE_DIR}/assets/icons/jocker-mx.icns)
   set_source_files_properties(${APP_ICNS} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
   target_sources(jocker-mx PRIVATE ${APP_ICNS})
@@ -113,6 +114,17 @@ if((WIN32 OR APPLE) AND Qt6_VERSION VERSION_GREATER_EQUAL 6.5)
     OUTPUT_SCRIPT JOCKER_DEPLOY_SCRIPT
     NO_UNSUPPORTED_PLATFORM_ERROR)
   install(SCRIPT ${JOCKER_DEPLOY_SCRIPT})
+  if(APPLE)
+    # Firma ad-hoc tras el despliegue (obligatoria en Apple Silicon; macdeployqt modifica las bibliotecas).
+    install(CODE [[
+      set(_app "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/Jocker-MX.app")
+      message(STATUS "Firmando (ad-hoc) ${_app}")
+      execute_process(COMMAND codesign --force --deep --sign - "${_app}" RESULT_VARIABLE _rc)
+      if(NOT _rc EQUAL 0)
+        message(FATAL_ERROR "codesign falló")
+      endif()
+    ]])
+  endif()
 endif()
 
 if(UNIX AND NOT APPLE)

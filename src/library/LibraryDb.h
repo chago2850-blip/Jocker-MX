@@ -20,6 +20,13 @@ struct TrackRow {
     double duration = 0, bpm = 0;
     int playCount = 0;
     qint64 lastPlayed = 0, added = 0;
+    int position = 0;          // posición dentro de una lista
+};
+
+struct PlaylistInfo {
+    qint64 id = 0;
+    QString name;
+    int count = 0;
 };
 
 struct TrackState {        // lo que un deck restaura al cargar
@@ -48,9 +55,19 @@ public:
     static int removeMissing(const QString& folderPrefix, const QSet<QString>& present);
 
     // Consultas
-    enum class View { All, History, MostPlayed, RecentlyAdded };
+    enum class View { All, History, MostPlayed, RecentlyAdded, Playlist };
     static QList<TrackRow> query(View view, const QString& folderPrefix, const QString& filter,
-                                 const QString& sortKey, bool ascending, int limit = 20000);
+                                 const QString& sortKey, bool ascending, int limit = 20000, qint64 playlistId = 0);
+    static TrackRow trackInfo(const QString& path);   // datos básicos (o el nombre del archivo)
+
+    // Listas de reproducción (guardan rutas, sobreviven a reescaneos)
+    static QList<PlaylistInfo> playlists();
+    static qint64 createPlaylist(const QString& name);
+    static bool renamePlaylist(qint64 id, const QString& name);
+    static void deletePlaylist(qint64 id);
+    static QStringList playlistPaths(qint64 id);
+    static void setPlaylistPaths(qint64 id, const QStringList& paths);
+    static void addToPlaylist(qint64 id, const QStringList& paths);
     static int count(const QString& folderPrefix);
     static QStringList pathsNeedingAnalysis(const QString& folderPrefix);
 

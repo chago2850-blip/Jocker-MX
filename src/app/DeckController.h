@@ -160,6 +160,11 @@ public:
     Q_INVOKABLE void stop();
     Q_INVOKABLE void sync();
     Q_INVOKABLE void seekFraction(double f);
+    Q_INVOKABLE void seekSeconds(double s);
+    Q_INVOKABLE void play();               // reproducir (no alterna)
+    Q_INVOKABLE void pause();              // pausar sin volver al cue
+    Q_INVOKABLE void matchTempo();         // sólo tempo, sin mover la fase
+    bool reachedEnd() const { return m_deck.reachedEnd.load(); }
     Q_INVOKABLE void hotCue(int i);         // fija o salta
     Q_INVOKABLE void clearHotCue(int i);
     Q_INVOKABLE void autoLoop(double beats);

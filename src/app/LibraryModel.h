@@ -29,6 +29,8 @@ class LibraryModel : public QAbstractListModel {
     Q_PROPERTY(bool analyzing READ analyzing NOTIFY analysisChanged)
     Q_PROPERTY(int analyzedCount READ analyzedCount NOTIFY analysisChanged)
     Q_PROPERTY(int analysisTotal READ analysisTotal NOTIFY analysisChanged)
+    Q_PROPERTY(qint64 playlistId READ playlistId WRITE setPlaylistId NOTIFY viewChanged)   // vista 4
+    Q_PROPERTY(QVariantList playlists READ playlists NOTIFY playlistsChanged)              // [{id, name, count}]
 
 public:
     enum Roles {
@@ -57,6 +59,18 @@ public:
     bool analyzing() const { return m_analyzing; }
     int analyzedCount() const { return m_analyzedCount.load(); }
     int analysisTotal() const { return m_analysisTotal; }
+    qint64 playlistId() const { return m_playlistId; }
+    void setPlaylistId(qint64 id);
+    QVariantList playlists() const { return m_playlists; }
+
+    Q_INVOKABLE QStringList visiblePaths() const;            // pistas visibles, en orden
+    Q_INVOKABLE qint64 createPlaylist(const QString& name, const QStringList& paths = {});
+    Q_INVOKABLE void renamePlaylist(qint64 id, const QString& name);
+    Q_INVOKABLE void deletePlaylist(qint64 id);
+    Q_INVOKABLE void addToPlaylist(qint64 id, const QStringList& paths);
+    Q_INVOKABLE void removeFromPlaylist(int row);            // en la vista de lista
+    Q_INVOKABLE void movePlaylistItem(int from, int to);     // en la vista de lista
+    Q_INVOKABLE QStringList playlistPaths(qint64 id) const;
 
     Q_INVOKABLE QString pathAt(int row) const;
     Q_INVOKABLE void rescan();
@@ -78,6 +92,7 @@ signals:
     void scanningChanged();
     void scanProgress();
     void analysisChanged();
+    void playlistsChanged();
 
 private:
     QString m_folder, m_filter;
@@ -95,6 +110,9 @@ private:
     std::atomic<int> m_analyzedCount{0};
     int m_analysisTotal = 0;
     std::atomic<bool> m_cancelAnalysis{false};
+    qint64 m_playlistId = 0;
+    QVariantList m_playlists;
+    void reloadPlaylists();
 };
 
 } // namespace jx

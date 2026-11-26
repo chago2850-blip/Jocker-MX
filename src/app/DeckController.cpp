@@ -266,6 +266,37 @@ void DeckController::seekFraction(double f) {
     m_deck.requestSeek(std::clamp(f, 0.0, 1.0) * static_cast<double>(m_track->frames));
 }
 
+void DeckController::seekSeconds(double sec) {
+    if (!m_track) return;
+    m_deck.reachedEnd.store(false);
+    m_deck.requestSeek(std::clamp(sec * m_track->sampleRate, 0.0, static_cast<double>(m_track->frames)));
+}
+
+void DeckController::play() {
+    if (m_track && !m_deck.playing.load()) playPause();
+}
+
+void DeckController::pause() {
+    if (!m_deck.playing.load()) return;
+    m_deck.playing.store(false);
+    emit playingChanged();
+}
+
+void DeckController::matchTempo() {
+    if (!m_track || !m_partner || !m_partner->m_track || m_track->bpm <= 0 || m_partner->m_track->bpm <= 0)
+        return;
+    double ratio = m_partner->bpm() / m_track->bpm;
+    while (ratio > 1.5) ratio /= 2.0;
+    while (ratio < 0.67) ratio *= 2.0;
+    const double absPitch = ratio - 1.0;
+    static const double ranges[] = {0.08, 0.16, 0.25, 0.5, 1.0};
+    if (std::abs(absPitch) > m_range) {
+        for (double r : ranges) if (r >= std::abs(absPitch)) { m_range = r; break; }
+    }
+    m_pitch = std::clamp(absPitch / m_range, -1.0, 1.0);
+    applyPitch();
+}
+
 void DeckController::hotCue(int i) {
     if (!m_track || i < 0 || i >= 8) return;
     if (m_hot[i] < 0) {
@@ -326,17 +357,7 @@ void DeckController::setSyncLock(bool on) {
 void DeckController::sync() {
     if (!m_track || !m_partner || !m_partner->m_track || m_track->bpm <= 0 || m_partner->m_track->bpm <= 0)
         return;
-    const double target = m_partner->bpm();
-    double ratio = target / m_track->bpm;
-    while (ratio > 1.5) ratio /= 2.0;     // medio / doble tiempo
-    while (ratio < 0.67) ratio *= 2.0;
-    const double absPitch = ratio - 1.0;
-    static const double ranges[] = {0.08, 0.16, 0.25, 0.5, 1.0};
-    if (std::abs(absPitch) > m_range) {
-        for (double r : ranges) if (r >= std::abs(absPitch)) { m_range = r; break; }
-    }
-    m_pitch = std::clamp(absPitch / m_range, -1.0, 1.0);
-    applyPitch();
+    matchTempo();
 
     // Alinear fase si el otro deck suena
     if (m_partner->playing()) {

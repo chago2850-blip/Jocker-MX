@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.6.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.6.0-dev")
+project(JockerMX VERSION 0.7.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.7.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -112,6 +112,8 @@ qt_add_qml_module(jocker-mx
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
+    src/app/AutomixPlan.h src/app/AutomixPlan.cpp
+    src/app/AutomixController.h src/app/AutomixController.cpp
   QML_FILES
     qml/Main.qml
     qml/Theme.qml
@@ -126,6 +128,10 @@ qt_add_qml_module(jocker-mx
     qml/PitchFader.qml
     qml/MidiDialog.qml
     qml/SamplerPanel.qml
+    qml/AutomixPanel.qml
+    qml/JxMenu.qml
+    qml/JxMenuItem.qml
+    qml/JxPrompt.qml
   RESOURCES
     resources/icon-256.png
     resources/logo-3d-256.png
@@ -285,7 +291,9 @@ if(JOCKER_BUILD_TESTS)
     src/app/Mixer.h src/app/Mixer.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
-    src/app/RecordingController.h src/app/RecordingController.cpp)
+    src/app/RecordingController.h src/app/RecordingController.cpp
+    src/app/AutomixPlan.h src/app/AutomixPlan.cpp
+    src/app/AutomixController.h src/app/AutomixController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
   target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY)
   target_include_directories(jx-tests SYSTEM PRIVATE third_party/eigen)

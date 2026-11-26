@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.6.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.7.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -71,6 +71,12 @@ Clic en un efecto lo enciende (otro clic lo apaga). El botón numérico cambia l
 - **⚡ Analizar todo** calcula en segundo plano el BPM, la tonalidad y la duración de las pistas que aún no se han analizado (puedes seguir mezclando; pulsa otra vez para detenerlo).
 - El BPM, el beatgrid, el cue y los hot cues de cada pista se guardan en la biblioteca (`biblioteca.sqlite` en la carpeta de datos de la app).
 
+### Listas de reproducción
+- En la barra izquierda, sección **LISTAS**: **+** crea una lista nueva. Clic en una lista la abre; clic derecho (o **⋯**) para **Reproducir en Automix**, **Agregar a la cola**, **Renombrar** o **Borrar**.
+- Para agregar pistas: **arrástralas** sobre el nombre de la lista, o clic derecho en la pista → **Agregar a lista ▸**.
+- Dentro de una lista el orden es el tuyo: clic derecho en una pista → **Subir**, **Bajar** o **Quitar de la lista**. Ordenar por columna sólo cambia la vista; vuelve a abrir la lista para ver su orden.
+- Las listas guardan la ruta de cada archivo, así que sobreviven a los reescaneos de la carpeta.
+
 ### Corregir el beatgrid
 Junto al BPM de cada deck: **½** y **×2** (si se detectó a mitad o al doble), **TAP** (pulsa al ritmo varias veces), **◂ / ▸** (mueve la rejilla 10 ms) y **⌖** (marca un beat justo en la posición actual). Una vez corregido, el beatgrid queda guardado y no se vuelve a analizar.
 
@@ -81,6 +87,21 @@ Abre la pestaña **🥁 Sampler** (abajo, junto a Biblioteca). Hay 8 pads con so
 - **Tu propio sonido**: clic derecho en el pad para elegir un archivo (WAV, MP3, FLAC u OGG) o arrástralo sobre el pad. **↺** regresa al sonido incluido. Se recuerda al volver a abrir la app.
 - **Volumen** del sampler, **🎧 Audífonos** para escucharlo también en cue y **Detener todo**.
 - Los pads, su volumen y el botón de grabar también se pueden asignar a tu controlador MIDI.
+
+## 5 bis. Automix
+El Automix toca y mezcla solo la música de su **cola**, usando los decks A y B como lo haría un DJ.
+1. Llena la cola: botón **+** verde de cada pista en la biblioteca, clic derecho → **Agregar a la cola de Automix** / **reproducir a continuación**, arrastrar pistas al panel **🔁 Automix**, **Agregar lo visible** (todo lo que muestra la biblioteca ahora) o **▶ Reproducir en Automix** desde una lista.
+2. Pulsa el gran botón **AUTOMIX** (o el indicador **AUTO** de la barra superior, o `Ctrl+M`). Si ya hay algo sonando continúa desde ahí; si no, carga la primera pista.
+3. Mientras suena una pista, la siguiente se **precarga** en el otro deck. Llegado el punto de mezcla:
+   - salta el silencio del final y del principio de cada pista;
+   - la salida empieza **al inicio de un compás** y la entrada en el primer beat;
+   - si los BPM son compatibles (±8 %, o medio/doble tiempo) **iguala tempo y fase**, cruza el crossfader e **intercambia los graves** a mitad de la mezcla para que no choquen los bajos;
+   - si no son compatibles, hace un **fundido** sin sincronizar.
+4. **Duración de la mezcla**: 4, 8, 16 o 32 beats (en pistas cortas se acorta sola). **⏩ Mezclar ya** (o `Ctrl+Intro`) mezcla en el siguiente compás; **Saltar** descarta la pista preparada y prepara la siguiente.
+5. Opciones: **Intercambiar graves**, **Volver al tempo original** (tras una mezcla sincronizada, la pista regresa poco a poco a su tempo, ≈1 % cada 10 s) y **Repetir la cola**.
+- En la barra superior, **AUTO** muestra cuánto falta para la siguiente mezcla. Puedes tocar los decks, efectos y sampler mientras el Automix trabaja; si pausas el deck que suena, el Automix espera.
+- **💾 Guardar lista** guarda la cola como lista de reproducción. La cola se recuerda al cerrar la app.
+- El Automix también se puede asignar al controlador MIDI: encender/apagar, mezclar ya y saltar.
 
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:
@@ -114,6 +135,8 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 | `←` / `→` | Mover el crossfader |
 | `Z X C V B N M ,` | Pads 1-8 del sampler |
 | `Ctrl+R` | Iniciar / detener la grabación |
+| `Ctrl+M` | Encender / apagar el Automix |
+| `Ctrl+Intro` | Automix: mezclar en el siguiente compás |
 
 ## 9. Solución de problemas
 - **"Sin dispositivo de audio"**: el sistema no encontró tarjeta de sonido; la interfaz funciona pero en silencio. Conecta una salida de audio y reinicia la app.
@@ -121,4 +144,4 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 10. Próximamente
-Más efectos, guardar stems en disco, video y karaoke, interfaz para teléfono, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Más efectos, guardar stems en disco, detección de estructura (intro/estribillo/outro) para el Automix, video y karaoke, transmisión en vivo e interfaz táctil para teléfono. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

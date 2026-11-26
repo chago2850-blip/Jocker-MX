@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Santiago Miguel y colaboradores de Jocker-MX
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MidiManager.h"
+#include "app/AutomixController.h"
 
 #include "app/DeckController.h"
 #include "app/Mixer.h"
@@ -52,6 +53,7 @@ const ActionDef kGlobalActions[] = {
     {"sampler1", "Pad de sampler 1"}, {"sampler2", "Pad de sampler 2"}, {"sampler3", "Pad de sampler 3"},
     {"sampler4", "Pad de sampler 4"}, {"sampler5", "Pad de sampler 5"}, {"sampler6", "Pad de sampler 6"},
     {"sampler7", "Pad de sampler 7"}, {"sampler8", "Pad de sampler 8"},
+    {"automix", "Automix encendido/apagado"}, {"automixnow", "Automix: mezclar ya"}, {"automixskip", "Automix: saltar siguiente"},
 };
 double centered(double v) { const double x = v * 2.0 - 1.0; return std::abs(x) < 0.02 ? 0.0 : x; }
 } // namespace
@@ -132,7 +134,8 @@ QVariantList MidiManager::actions() const {
     }
     for (const ActionDef& a : kGlobalActions)
         out << QVariantMap{{"id", QString::fromLatin1(a.id)}, {"label", QString::fromUtf8(a.label)},
-                           {"group", QString::fromLatin1(a.id).startsWith("sampler") ? "Sampler" : "Mezclador y grabación"}};
+                           {"group", QString::fromLatin1(a.id).startsWith("sampler") ? "Sampler"
+                                    : QString::fromLatin1(a.id).startsWith("automix") ? "Automix" : "Mezclador y grabación"}};
     return out;
 }
 
@@ -224,6 +227,9 @@ void MidiManager::dispatch(const QString& action, int type, int value, int value
         else if (action == "phones") m_mixer->setHeadphoneVolume(v);
         else if (action == "samplervol" && m_sampler) m_sampler->setVolume(v);
         else if (action == "rec" && m_recorder && pressed) m_recorder->toggle();
+        else if (action == "automix" && m_automix && pressed) m_automix->toggle();
+        else if (action == "automixnow" && m_automix && pressed) m_automix->mixNow();
+        else if (action == "automixskip" && m_automix && pressed) m_automix->skipNext();
         else if (action.startsWith("sampler") && m_sampler) {
             const int slot = action.mid(7).toInt() - 1;
             pressed ? m_sampler->press(slot) : m_sampler->release(slot);

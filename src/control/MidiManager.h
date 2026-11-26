@@ -37,6 +37,7 @@ public:
     MidiManager(QList<DeckController*> decks, Mixer* mixer, SamplerController* sampler = nullptr,
                 RecordingController* recorder = nullptr, QObject* parent = nullptr);
     ~MidiManager() override;
+    void setAutomix(class AutomixController* a) { m_automix = a; }
 
     QStringList devices() const { return m_deviceNames; }
     QVariantList actions() const;
@@ -77,6 +78,7 @@ private:
     Mixer* m_mixer;
     SamplerController* m_sampler;
     RecordingController* m_recorder;
+    AutomixController* m_automix = nullptr;
     std::vector<std::unique_ptr<Input>> m_inputs;
     QStringList m_deviceNames;
     QHash<int, QString> m_map;            // clave del mensaje → acción

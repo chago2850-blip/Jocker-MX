@@ -10,12 +10,13 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.6.0-dev (alfa).** Nuevo: **separación de stems con IA** (voz, batería, bajo y melodía) en tu propio equipo. Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-060-dev).
+> **Estado: 0.7.0-dev (alfa).** Nuevo: **Automix** (mezcla automática sincronizada con cola de reproducción) y **listas de reproducción**. Funcionan **stems con IA**, 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-070-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-sampler.png" alt="Sampler de Jocker-MX" width="49%"> <img src="assets/screenshots/jocker-mx-midi.png" alt="Controladores MIDI" width="49%"></p>
+<p align="center"><img src="assets/screenshots/jocker-mx-automix.png" alt="Automix de Jocker-MX mezclando" width="100%"></p>
 
-## Lo que ya funciona en 0.6.0-dev
+## Lo que ya funciona en 0.7.0-dev
 - **2 decks** con carga de **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
@@ -28,14 +29,16 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 - **Biblioteca SQLite**: escaneo incremental de tu carpeta, lectura de etiquetas (ID3 en MP3, Vorbis en FLAC, INFO en WAV), columnas de título, artista, álbum, género, BPM, tonalidad, duración y veces tocada; vistas **Historial**, **Más tocadas** y **Agregadas**.
 - **Búsqueda** sin acentos ni mayúsculas («cancion» encuentra «Canción») y filtros `bpm:120-128` y `key:8A`.
 - **Beatgrid editable**: ½, ×2, TAP, mover la rejilla ±10 ms y «beat aquí»; se guarda por pista junto con cue y hot cues.
+- **Automix**: cola de reproducción que se mezcla sola entre los decks A y B. Salta los silencios, sale al inicio de un compás, **sincroniza tempo y fase** cuando los BPM son compatibles (±8 %, también medio/doble tiempo), cruza el crossfader e **intercambia los graves** a mitad de la mezcla; si no son compatibles hace un fundido. Mezcla de 4/8/16/32 beats, **Mezclar ya** (en el siguiente compás), saltar, repetir la cola, regreso suave al tempo original y cuenta regresiva en la barra superior.
+- **Listas de reproducción** en la biblioteca: crear, renombrar, reordenar, buscar dentro, arrastrar pistas sobre una lista, mandarlas al Automix o guardar la cola como lista.
 - **Stems con IA**: separa cada pista en **voz, batería, bajo y melodía** en segundo plano al cargarla; botones por stem, **ACAPELLA** e **INSTRUMENTAL**, todo sin cortes y compatible con key lock, scratch, loops y efectos. Usa el modelo libre Spleeter 4 stems (Deezer, MIT) con un **motor de inferencia propio en C++** (sin servicios en la nube ni runtimes externos).
 - **Tonalidad automática** con notación **Camelot** (y Open Key): se muestra en cada deck y en la biblioteca, en **verde** cuando combina armónicamente con lo que está sonando.
 - **Efectos por deck sincronizados al beat**: eco, reverb, flanger, phaser, crush (bitcrusher) y gate, con duración de ¼ a 8 beats y perilla de cantidad.
 - **Sampler de 8 pads** con sonidos incluidos (bocina, sirena, láser, bombo, palmas, subida, impacto, rewind — sintetizados, libres de derechos), modos ONE / LOOP / HOLD, tus propios sonidos (clic derecho o arrastrar) y teclas `Z X C V B N M ,`.
 - **Grabación** de la mezcla (botón **REC** o `Ctrl+R`) en WAV de 24 bits, con **lista de canciones** (.txt) y hoja **.cue** con los tiempos de cada pista.
 - **Analizar todo**: calcula BPM, tonalidad y duración de toda la biblioteca en segundo plano.
-- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 62 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
-- Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader.
+- **Controladores MIDI** (USB, cualquier marca): detección automática, **MIDI learn** de 65 acciones por deck y del mezclador (incluido plato con scratch), mapeo guardado en JSON.
+- Atajos: `Q`/`P` play A/B · `W`/`O` sync · `1-4` / `7-0` hot cues · `A`/`L` loop de 4 · `←`/`→` crossfader · `Ctrl+M` Automix · `Ctrl+Intro` mezclar ya.
 
 ### Instalar
 Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-blip/Jocker-MX/releases) (lo genera automáticamente GitHub Actions):
@@ -85,14 +88,14 @@ Opciones útiles: `jocker-mx --library ~/Música -a pista1.mp3 -b pista2.flac --
 | [03 · Arquitectura](docs/03-ARQUITECTURA.md) | Pila tecnológica, motor de audio, stems, UI, Android |
 | [04 · Plan de trabajo](docs/04-PLAN-DE-TRABAJO.md) | Fases F0-F13, hitos 0.1 → 1.0 en 24 meses, equipo y riesgos |
 | [05 · Licencias y dependencias](docs/05-LICENCIAS-Y-DEPENDENCIAS.md) | Compatibilidad GPL-3.0+, modelos de IA, *clean room* |
-| [06 · Manual de usuario](docs/06-MANUAL-DE-USUARIO.md) | Cómo usar Jocker-MX 0.1 paso a paso |
+| [06 · Manual de usuario](docs/06-MANUAL-DE-USUARIO.md) | Cómo usar Jocker-MX paso a paso |
 
 ## Hoja de ruta
 | Versión | Mes | Hito |
 |---|---|---|
 | 0.1 "Primer beat" | 6 | Decks, mezclador, sync, biblioteca (escritorio) |
 | 0.5 "Cabina" | 12 | Controladores, FX, sampler, stems, Android alfa |
-| 0.8 "Escenario" | 17 | Video, karaoke, automix, DVS, broadcast |
+| 0.8 "Escenario" | 17 | Video, karaoke, ~~automix~~ (adelantado a 0.7), DVS, broadcast |
 | 0.9 RC | 21 | IA completa, Android beta |
 | **1.0 "Jocker"** | 24 | Paridad con VirtualDJ, instaladores para las 4 plataformas |
 

@@ -23,6 +23,27 @@ Rectangle {
         Text { text: appVersion; color: Theme.faint; font.pixelSize: 11; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 12 }
         Item { Layout.fillWidth: true }
 
+        Rectangle {     // Automix
+            Layout.preferredHeight: 28; Layout.preferredWidth: amTxt.implicitWidth + 34
+            radius: 6
+            color: automix.enabled ? Qt.rgba(0.33, 0.88, 0.54, 0.15) : (amMa.containsMouse ? Theme.panel2 : "transparent")
+            border.color: automix.enabled ? Theme.green : Theme.border
+            Rectangle {
+                id: amDot
+                width: 10; height: 10; radius: 5
+                anchors.left: parent.left; anchors.leftMargin: 9; anchors.verticalCenter: parent.verticalCenter
+                color: Theme.green; opacity: automix.enabled ? 1 : 0.35
+            }
+            Text {
+                id: amTxt
+                anchors.left: amDot.right; anchors.leftMargin: 7; anchors.verticalCenter: parent.verticalCenter
+                text: !automix.enabled ? "AUTO" : (automix.mixing ? "AUTO · mezclando"
+                      : (automix.secondsToMix > 0 && automix.nextTitle.length ? "AUTO · " + Theme.formatTime(automix.secondsToMix).slice(0, 5) : "AUTO"))
+                color: automix.enabled ? Theme.green : Theme.dim
+                font.pixelSize: 11; font.weight: Font.Bold
+            }
+            MouseArea { id: amMa; anchors.fill: parent; hoverEnabled: true; onClicked: automix.toggle() }
+        }
         Rectangle {     // Grabación
             Layout.preferredHeight: 28; Layout.preferredWidth: recTxt.implicitWidth + 34
             radius: 6

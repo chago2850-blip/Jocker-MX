@@ -8,6 +8,8 @@
 #include "analysis/PlatformDecoder.h"
 #include "app/DeckController.h"
 #include "app/Mixer.h"
+#include "app/AutomixController.h"
+#include "app/AutomixPlan.h"
 #include "app/RecordingController.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
@@ -40,7 +42,8 @@ static int g_fail = 0, g_pass = 0;
     } while (0)
 
 // Pista sintética: bombo en cada beat, hi-hat a contratiempo y bajo.
-static void writeTestWav(const QString& path, double bpm, double firstBeat, double secs, int sr = 44100) {
+static void writeTestWav(const QString& path, double bpm, double firstBeat, double secs, int sr = 44100,
+                         double soundUntil = -1) {
     const int n = static_cast<int>(secs * sr);
     std::vector<float> l(n, 0.f), r(n, 0.f);
     std::mt19937 rng(42);
@@ -48,7 +51,7 @@ static void writeTestWav(const QString& path, double bpm, double firstBeat, doub
     const double beat = 60.0 / bpm;
     for (int k = 0;; ++k) {
         const double tb = firstBeat + k * beat;
-        if (tb >= secs) break;
+        if (tb >= secs || (soundUntil > 0 && tb >= soundUntil)) break;
         const int s = static_cast<int>(tb * sr);
         double ph = 0;
         for (int i = 0; i < sr / 4 && s + i < n; ++i) {
@@ -572,6 +575,117 @@ int main(int argc, char** argv) {
             CHECK(std::abs(rms(back) - rms(full)) < rms(full) * 0.15, "con todos los stems vuelve el sonido original (RMS %.3f)", rms(back));
             a.playPause();
         }
+    }
+
+
+    std::printf("\n[15] Listas de reproducción\n");
+    {
+        const QString p1 = tmp.filePath("t124.wav"), p2 = tmp.filePath("t128.wav"), p3 = tmp.filePath("t95.wav");
+        const qint64 id = jx::LibraryDb::createPlaylist("  Boda sábado ");
+        CHECK(id > 0, "lista creada");
+        jx::LibraryDb::addToPlaylist(id, {p2, p1});
+        jx::LibraryDb::addToPlaylist(id, {p3});
+        auto rows = jx::LibraryDb::query(jx::LibraryDb::View::Playlist, {}, {}, {}, true, 100, id);
+        CHECK(rows.size() == 3 && rows[0].path == p2 && rows[1].path == p1 && rows[2].path == p3,
+              "la lista conserva su orden (%d pistas)", int(rows.size()));
+        auto pls = jx::LibraryDb::playlists();
+        CHECK(pls.size() == 1 && pls[0].name == "Boda sábado" && pls[0].count == 3, "nombre y conteo (%s)",
+              pls.isEmpty() ? "-" : qPrintable(pls[0].name));
+        QStringList ps = jx::LibraryDb::playlistPaths(id);
+        ps.move(2, 0);
+        jx::LibraryDb::setPlaylistPaths(id, ps);
+        CHECK(jx::LibraryDb::playlistPaths(id).first() == p3, "reordenar");
+        auto f = jx::LibraryDb::query(jx::LibraryDb::View::Playlist, {}, "t128", {}, true, 100, id);
+        CHECK(f.size() == 1 && f[0].path == p2, "buscar dentro de la lista");
+        CHECK(jx::LibraryDb::renamePlaylist(id, "Boda") && jx::LibraryDb::playlists()[0].name == "Boda", "renombrar");
+        jx::LibraryDb::deletePlaylist(id);
+        CHECK(jx::LibraryDb::playlists().isEmpty() && jx::LibraryDb::playlistPaths(id).isEmpty(), "borrar la lista y sus pistas");
+    }
+
+    std::printf("\n[16] Automix\n");
+    {
+        CHECK(jx::tempoCompatible(124, 128) && !jx::tempoCompatible(124, 90) && jx::tempoCompatible(174, 87.5),
+              "compatibilidad de tempo (±8 %%, medio tiempo)");
+        const QString m1 = tmp.filePath("am1.wav"), m2 = tmp.filePath("am2.wav"), m3 = tmp.filePath("am3.wav");
+        writeTestWav(m1, 124, 1.5, 32, 44100, 29.0);    // 1.5 s de silencio al principio y ~3 s al final
+        writeTestWav(m2, 126, 0.2, 30);
+        writeTestWav(m3, 90, 0.3, 16);                  // tempo incompatible: fundido sin sincronizar
+        QString err;
+        auto t1 = jx::loadAndAnalyze(m1, sr, &err);
+        CHECK(t1 != nullptr, "pista de prueba analizada");
+        if (t1) {
+            const jx::MixPoints mp = jx::computeMixPoints(*t1, 16);
+            const double beat = 60.0 / t1->bpm, fb = t1->firstBeat / sr;
+            const double barPos = (mp.mixOut - fb) / beat / 4.0;
+            CHECK(std::abs(mp.firstAudible - 1.5) < 0.05 && std::abs(mp.mixIn - 1.5) < 0.03,
+                  "salta el silencio inicial y entra en el primer beat (%.3f s)", mp.mixIn);
+            CHECK(mp.lastAudible > 28.9 && mp.lastAudible < 29.6, "ignora el silencio final (último sonido %.2f s)", mp.lastAudible);
+            CHECK(mp.beatAligned && std::abs(barPos - std::round(barPos)) < 0.01, "la salida empieza en un compás (%.2f s)", mp.mixOut);
+            CHECK(std::abs(mp.transition - 16 * beat) < 1e-6 && mp.mixOut + mp.transition <= mp.lastAudible + 0.01,
+                  "transición de 16 beats que termina antes del silencio (%.2f s)", mp.transition);
+        }
+
+        jx::Mixer mx(&eng, {&a, &b});
+        if (a.playing()) a.pause();
+        if (b.playing()) b.pause();
+        jx::AutomixController am(&a, &b, &mx);
+        am.clear();
+        am.setTransitionBeats(8);
+        am.setBassSwap(true);
+        am.setTempoReturn(false);
+        am.setRepeat(false);
+        am.add({m1, m2, m3});
+        CHECK(am.queue().count() == 3, "tres pistas en la cola");
+        am.setEnabled(true);
+
+        double simT = 0, mix1At = -1, mix2At = -1, aPosAtMix = -1, maxPhaseErr = 0, bpmDiff = 1e9;
+        bool sawBassKill = false, mix2Synced = true, endedOk = false;
+        int finishedMixes = 0;
+        bool prevMixing = false;
+        double xfAfter1 = 0, eqAfter1 = 1, aPausedAfter1 = 0;
+        QElapsedTimer wall; wall.start();
+        while (simT < 90 && wall.elapsed() < 120000) {
+            QCoreApplication::processEvents(QEventLoop::AllEvents, 1);
+            // La carga real tarda en tiempo de reloj; la simulación avanza más rápido que el tiempo real.
+            if (a.loading() || b.loading()) { QCoreApplication::processEvents(QEventLoop::AllEvents, 20); continue; }
+            am.step();
+            renderSecs(0.025);
+            simT += 0.025;
+            if (am.mixing() && !prevMixing) {
+                if (mix1At < 0) { mix1At = simT; aPosAtMix = a.position(); }
+                else if (mix2At < 0) { mix2At = simT; mix2Synced = am.nextSynced(); }
+            }
+            if (am.mixing() && mix2At < 0 && am.mixProgress() > 0.2 && am.mixProgress() < 0.8 && b.playing()) {
+                double d = std::abs(a.beatPhase() - b.beatPhase());
+                d = std::min(d, 1.0 - d);
+                if (am.mixProgress() > 0.3) maxPhaseErr = std::max(maxPhaseErr, d);
+                bpmDiff = std::abs(a.bpm() - b.bpm());
+                if (am.mixProgress() < 0.4 && b.eqLow() < -0.99) sawBassKill = true;
+            }
+            if (!am.mixing() && prevMixing) {
+                ++finishedMixes;
+                if (finishedMixes == 1) { xfAfter1 = mx.crossfader(); eqAfter1 = std::abs(a.eqLow()) + std::abs(b.eqLow()); aPausedAfter1 = a.playing() ? 0 : 1; }
+            }
+            prevMixing = am.mixing();
+            if (qEnvironmentVariableIsSet("JX_AM_DEBUG") && int(simT * 40) % 40 == 0)
+                std::printf("    t=%.1f %s act=%d A=%.2f(%d) B=%.2f(%d) xf=%.2f\n", simT, qPrintable(am.status()), am.activeDeck(),
+                            a.position(), a.playing(), b.position(), b.playing(), mx.crossfader());
+            if (am.status() == QStringLiteral("Fin de la cola")) { endedOk = true; break; }
+        }
+        CHECK(mix1At > 0 && t1, "empezó la primera mezcla a los %.1f s", mix1At);
+        if (t1 && mix1At > 0) {
+            const jx::MixPoints mp = jx::computeMixPoints(*t1, 8);
+            CHECK(std::abs(aPosAtMix - mp.mixOut) < 0.1, "sale en su punto de mezcla (%.2f s, previsto %.2f s)", aPosAtMix, mp.mixOut);
+        }
+        CHECK(bpmDiff < 0.05, "tempo igualado durante la mezcla (diferencia %.3f BPM)", bpmDiff);
+        CHECK(maxPhaseErr < 0.03, "beats en fase durante la mezcla (error máx. %.1f %% de beat)", maxPhaseErr * 100);
+        CHECK(sawBassKill, "graves del deck entrante cortados al inicio");
+        CHECK(finishedMixes >= 1 && xfAfter1 > 0.99 && eqAfter1 < 1e-6 && aPausedAfter1 == 1,
+              "al terminar: crossfader en B, EQ restaurado y deck A en pausa");
+        CHECK(mix2At > mix1At && !mix2Synced, "segunda mezcla sin sincronizar (90 BPM es incompatible)");
+        CHECK(endedOk && am.queue().count() == 0, "la cola se reprodujo completa (%.0f s simulados)", simT);
+        am.setEnabled(false);
+        a.pause(); b.pause();
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

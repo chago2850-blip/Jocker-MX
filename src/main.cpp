@@ -4,6 +4,7 @@
 #include "app/LibraryModel.h"
 #include "app/Mixer.h"
 #include "app/RecordingController.h"
+#include "app/AutomixController.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
@@ -23,7 +24,7 @@
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.6.0-dev"
+#define JOCKER_VERSION "0.7.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -45,8 +46,10 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler)", "nombre");
-    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel});
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix)", "nombre");
+    QCommandLineOption optQueue("queue", "Agregar un archivo a la cola de Automix (se puede repetir)", "archivo");
+    QCommandLineOption optAutomix("automix", "Encender el Automix al iniciar");
+    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix});
     cli.process(app);
 
     const int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/JockerMX/resources/fonts/Montserrat.ttf"));
@@ -70,6 +73,9 @@ int main(int argc, char* argv[]) {
     jx::SamplerController sampler(&engine);
     jx::RecordingController recorder(&engine, {&deckA, &deckB});
     jx::MidiManager midi({&deckA, &deckB}, &mixer, &sampler, &recorder);
+    jx::AutomixController automix(&deckA, &deckB, &mixer);
+    midi.setAutomix(&automix);
+    if (cli.isSet(optQueue)) { automix.clear(); automix.add(cli.values(optQueue)); }
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
     QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
     QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
@@ -97,6 +103,7 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("midi"), &midi);
     qml.rootContext()->setContextProperty(QStringLiteral("sampler"), &sampler);
     qml.rootContext()->setContextProperty(QStringLiteral("recorder"), &recorder);
+    qml.rootContext()->setContextProperty(QStringLiteral("automix"), &automix);
     qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -109,6 +116,7 @@ int main(int argc, char* argv[]) {
 
     if (cli.isSet(optA)) deckA.load(cli.value(optA));
     if (cli.isSet(optB)) deckB.load(cli.value(optB));
+    if (cli.isSet(optAutomix)) automix.setEnabled(true);
     if (cli.isSet(optPlay)) {
         auto startWhenReady = [](jx::DeckController* d) {
             QObject::connect(d, &jx::DeckController::trackChanged, d, [d]() {

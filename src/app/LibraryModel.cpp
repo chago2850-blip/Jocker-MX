@@ -7,6 +7,7 @@
 #include "library/TagReader.h"
 
 #include <QDirIterator>
+#include <algorithm>
 #include <QFileInfo>
 #include <QPointer>
 #include <QSet>
@@ -43,6 +44,7 @@ LibraryModel::LibraryModel(QObject* parent) : QAbstractListModel(parent) {
     m_sortKey = s.value("library/sort", "artist").toString();
     m_asc = s.value("library/asc", true).toBool();
     setFolder(f);
+    reloadPlaylists();
 }
 
 int LibraryModel::rowCount(const QModelIndex& parent) const {
@@ -105,8 +107,89 @@ void LibraryModel::setFilter(const QString& f) {
 
 void LibraryModel::setView(int v) {
     if (v == m_view) return;
+    if (m_view == 4 && m_sortKey == QLatin1String("pos")) {   // al salir de una lista, volver al orden guardado
+        QSettings s;
+        m_sortKey = s.value("library/sort", "artist").toString();
+        m_asc = s.value("library/asc", true).toBool();
+        emit sortChanged();
+    }
     m_view = v;
     emit viewChanged();
+    refresh();
+}
+
+void LibraryModel::setPlaylistId(qint64 id) {
+    if (id == m_playlistId && m_view == 4) return;
+    m_playlistId = id;
+    m_view = 4;
+    m_sortKey = QStringLiteral("pos");   // orden propio de la lista
+    m_asc = true;
+    emit sortChanged();
+    emit viewChanged();
+    refresh();
+}
+
+void LibraryModel::reloadPlaylists() {
+    m_playlists.clear();
+    for (const PlaylistInfo& p : LibraryDb::playlists())
+        m_playlists << QVariantMap{{"id", p.id}, {"name", p.name}, {"count", p.count}};
+    emit playlistsChanged();
+}
+
+QStringList LibraryModel::visiblePaths() const {
+    QStringList out;
+    out.reserve(m_rows.size());
+    for (const TrackRow& r : m_rows) out << r.path;
+    return out;
+}
+
+QStringList LibraryModel::playlistPaths(qint64 id) const { return LibraryDb::playlistPaths(id); }
+
+qint64 LibraryModel::createPlaylist(const QString& name, const QStringList& paths) {
+    const qint64 id = LibraryDb::createPlaylist(name);
+    if (id && !paths.isEmpty()) LibraryDb::setPlaylistPaths(id, paths);
+    reloadPlaylists();
+    return id;
+}
+
+void LibraryModel::renamePlaylist(qint64 id, const QString& name) {
+    if (LibraryDb::renamePlaylist(id, name)) reloadPlaylists();
+}
+
+void LibraryModel::deletePlaylist(qint64 id) {
+    LibraryDb::deletePlaylist(id);
+    if (m_view == 4 && m_playlistId == id) setView(0);
+    reloadPlaylists();
+}
+
+void LibraryModel::addToPlaylist(qint64 id, const QStringList& paths) {
+    QStringList clean;
+    for (const QString& p : paths)
+        clean << (p.startsWith(QLatin1String("file:")) ? QUrl(p).toLocalFile() : p);
+    LibraryDb::addToPlaylist(id, clean);
+    reloadPlaylists();
+    if (m_view == 4 && m_playlistId == id) refresh();
+}
+
+void LibraryModel::removeFromPlaylist(int row) {
+    if (m_view != 4 || row < 0 || row >= m_rows.size()) return;
+    QStringList paths = LibraryDb::playlistPaths(m_playlistId);
+    const int pos = m_rows[row].position;
+    if (pos < 0 || pos >= paths.size()) return;
+    paths.removeAt(pos);
+    LibraryDb::setPlaylistPaths(m_playlistId, paths);
+    reloadPlaylists();
+    refresh();
+}
+
+void LibraryModel::movePlaylistItem(int from, int to) {
+    if (m_view != 4 || from < 0 || from >= m_rows.size()) return;
+    QStringList paths = LibraryDb::playlistPaths(m_playlistId);
+    const int a = m_rows[from].position;
+    const int b = std::clamp(to, 0, static_cast<int>(paths.size()) - 1);
+    if (a < 0 || a >= paths.size() || a == b) return;
+    paths.move(a, b);
+    LibraryDb::setPlaylistPaths(m_playlistId, paths);
     refresh();
 }
 
@@ -123,7 +206,11 @@ void LibraryModel::sortBy(const QString& key) {
 void LibraryModel::refresh() {
     const QString prefix = m_folder.isEmpty() ? QString() : m_folder + '/';
     beginResetModel();
-    m_rows = LibraryDb::query(static_cast<LibraryDb::View>(m_view), prefix, m_filter, m_sortKey, m_asc);
+    const auto view = static_cast<LibraryDb::View>(m_view);
+    // En una lista se respeta su orden; ordenar por columna sólo cambia la vista.
+    const QString sort = view == LibraryDb::View::Playlist && m_sortKey == QLatin1String("pos") ? QString() : m_sortKey;
+    m_rows = LibraryDb::query(view, prefix, m_filter, view == LibraryDb::View::Playlist ? sort : m_sortKey,
+                              view == LibraryDb::View::Playlist && sort.isEmpty() ? true : m_asc, 20000, m_playlistId);
     endResetModel();
     m_total = prefix.isEmpty() ? 0 : LibraryDb::count(prefix);
     emit countsChanged();

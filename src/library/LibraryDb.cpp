@@ -32,6 +32,10 @@ const char* kSchema[] = {
     "CREATE INDEX IF NOT EXISTS idx_history_track ON history(track_id)",
     "CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT)",
     "INSERT OR IGNORE INTO meta(k, v) VALUES('schema', '1')",
+    "CREATE TABLE IF NOT EXISTS playlists (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created INTEGER)",
+    "CREATE TABLE IF NOT EXISTS playlist_items (id INTEGER PRIMARY KEY, playlist_id INTEGER NOT NULL,"
+    " pos INTEGER NOT NULL, path TEXT NOT NULL)",
+    "CREATE INDEX IF NOT EXISTS idx_pli ON playlist_items(playlist_id, pos)",
 };
 
 QString hotToText(const QVector<double>& h) {
@@ -164,7 +168,7 @@ int LibraryDb::removeMissing(const QString& folderPrefix, const QSet<QString>& p
 }
 
 QList<TrackRow> LibraryDb::query(View view, const QString& folderPrefix, const QString& filter,
-                                 const QString& sortKey, bool ascending, int limit) {
+                                 const QString& sortKey, bool ascending, int limit, qint64 playlistId) {
     QStringList where;
     QVariantList binds;
     if (!folderPrefix.isEmpty() && view == View::All) {
@@ -220,6 +224,12 @@ QList<TrackRow> LibraryDb::query(View view, const QString& folderPrefix, const Q
     case View::All:
         sql += ", 0 FROM tracks t";
         break;
+    case View::Playlist:
+        sql += ", pi.pos FROM playlist_items pi JOIN tracks t ON t.path = pi.path";
+        where.prepend("pi.playlist_id = ?");
+        binds.prepend(playlistId);
+        if (sortKey.isEmpty() || sortKey == "pos") order = ascending ? "pi.pos ASC" : "pi.pos DESC";
+        break;
     }
     if (!where.isEmpty()) sql += " WHERE " + where.join(" AND ");
     sql += " ORDER BY " + order + QStringLiteral(" LIMIT %1").arg(limit);
@@ -247,6 +257,7 @@ QList<TrackRow> LibraryDb::query(View view, const QString& folderPrefix, const Q
         r.bpm = q.value(10).toDouble();
         r.playCount = q.value(11).toInt();
         r.lastPlayed = view == View::History ? q.value(14).toLongLong() : q.value(12).toLongLong();
+        if (view == View::Playlist) r.position = q.value(14).toInt();
         r.added = q.value(13).toLongLong();
         rows << r;
     }
@@ -366,6 +377,100 @@ void LibraryDb::addHistory(const QString& path, int deck) {
     q.addBindValue(deck);
     q.addBindValue(path);
     q.exec();
+}
+
+// ------------------------------------------------------------------ listas de reproducción
+QList<PlaylistInfo> LibraryDb::playlists() {
+    QList<PlaylistInfo> out;
+    QSqlQuery q(db());
+    q.exec("SELECT p.id, p.name, (SELECT COUNT(*) FROM playlist_items i WHERE i.playlist_id = p.id)"
+           " FROM playlists p ORDER BY p.name COLLATE NOCASE");
+    while (q.next()) out << PlaylistInfo{q.value(0).toLongLong(), q.value(1).toString(), q.value(2).toInt()};
+    return out;
+}
+
+qint64 LibraryDb::createPlaylist(const QString& name) {
+    QSqlQuery q(db());
+    q.prepare("INSERT INTO playlists(name, created) VALUES(?, ?)");
+    q.addBindValue(name.trimmed().isEmpty() ? QStringLiteral("Lista nueva") : name.trimmed());
+    q.addBindValue(now());
+    if (!q.exec()) return 0;
+    return q.lastInsertId().toLongLong();
+}
+
+bool LibraryDb::renamePlaylist(qint64 id, const QString& name) {
+    if (name.trimmed().isEmpty()) return false;
+    QSqlQuery q(db());
+    q.prepare("UPDATE playlists SET name = ? WHERE id = ?");
+    q.addBindValue(name.trimmed());
+    q.addBindValue(id);
+    return q.exec() && q.numRowsAffected() > 0;
+}
+
+void LibraryDb::deletePlaylist(qint64 id) {
+    QSqlDatabase d = db();
+    d.transaction();
+    QSqlQuery q(d);
+    q.prepare("DELETE FROM playlist_items WHERE playlist_id = ?");
+    q.addBindValue(id);
+    q.exec();
+    q.prepare("DELETE FROM playlists WHERE id = ?");
+    q.addBindValue(id);
+    q.exec();
+    d.commit();
+}
+
+QStringList LibraryDb::playlistPaths(qint64 id) {
+    QStringList out;
+    QSqlQuery q(db());
+    q.prepare("SELECT path FROM playlist_items WHERE playlist_id = ? ORDER BY pos");
+    q.addBindValue(id);
+    q.exec();
+    while (q.next()) out << q.value(0).toString();
+    return out;
+}
+
+void LibraryDb::setPlaylistPaths(qint64 id, const QStringList& paths) {
+    QSqlDatabase d = db();
+    d.transaction();
+    QSqlQuery q(d);
+    q.prepare("DELETE FROM playlist_items WHERE playlist_id = ?");
+    q.addBindValue(id);
+    q.exec();
+    q.prepare("INSERT INTO playlist_items(playlist_id, pos, path) VALUES(?, ?, ?)");
+    for (int i = 0; i < paths.size(); ++i) {
+        ensureTrack(d, paths[i]);
+        q.addBindValue(id);
+        q.addBindValue(i);
+        q.addBindValue(paths[i]);
+        q.exec();
+    }
+    d.commit();
+}
+
+void LibraryDb::addToPlaylist(qint64 id, const QStringList& paths) {
+    QStringList all = playlistPaths(id);
+    all += paths;
+    setPlaylistPaths(id, all);
+}
+
+TrackRow LibraryDb::trackInfo(const QString& path) {
+    TrackRow r;
+    r.path = path;
+    QSqlQuery q(db());
+    q.prepare("SELECT id, title, artist, musical_key, duration, CASE WHEN bpm > 0 THEN bpm ELSE tag_bpm END"
+              " FROM tracks WHERE path = ?");
+    q.addBindValue(path);
+    if (q.exec() && q.next()) {
+        r.id = q.value(0).toLongLong();
+        r.title = q.value(1).toString();
+        r.artist = q.value(2).toString();
+        r.key = q.value(3).toString();
+        r.duration = q.value(4).toDouble();
+        r.bpm = q.value(5).toDouble();
+    }
+    if (r.title.isEmpty()) r.title = QFileInfo(path).completeBaseName();
+    return r;
 }
 
 } // namespace jx

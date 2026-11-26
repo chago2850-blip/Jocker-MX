@@ -18,9 +18,12 @@
 #include <QQuickStyle>
 #include <QQuickWindow>
 #include <QTimer>
+#ifdef Q_OS_ANDROID
+#include <QtCore/private/qandroidextras_p.h>
+#endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.4.0-dev"
+#define JOCKER_VERSION "0.5.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -72,6 +75,19 @@ int main(int argc, char* argv[]) {
     QObject::connect(&deckB, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
     QObject::connect(&deckA, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
     QObject::connect(&deckB, &jx::DeckController::played, &library, &jx::LibraryModel::onPlayed);
+
+#ifdef Q_OS_ANDROID
+    // Permiso para leer la música del teléfono/tableta (Android 13+: READ_MEDIA_AUDIO; antes: almacenamiento)
+    {
+        bool granted = false;
+        for (const QString perm : {QStringLiteral("android.permission.READ_MEDIA_AUDIO"),
+                                   QStringLiteral("android.permission.READ_EXTERNAL_STORAGE")}) {
+            if (QtAndroidPrivate::checkPermission(perm).result() == QtAndroidPrivate::Authorized) { granted = true; break; }
+            if (QtAndroidPrivate::requestPermission(perm).result() == QtAndroidPrivate::Authorized) { granted = true; break; }
+        }
+        if (granted) library.rescan();
+    }
+#endif
 
     QQmlApplicationEngine qml;
     qml.rootContext()->setContextProperty(QStringLiteral("deckA"), &deckA);

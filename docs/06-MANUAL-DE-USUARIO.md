@@ -1,8 +1,8 @@
-# 06 · Manual de usuario — Jocker-MX 0.4.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.5.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
-2. Pulsa **📁 Carpeta** (abajo) y elige dónde está tu música. Se aceptan **MP3, WAV, FLAC y OGG**.
+2. Pulsa **📁 Carpeta** (abajo) y elige dónde está tu música. Se aceptan **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF**.
 3. Carga una pista con los botones **A** o **B** de cada fila, con **doble clic** (va al deck libre) o **arrastrándola** sobre un deck. También puedes arrastrar archivos desde el explorador de tu sistema.
 4. Al cargar, la pista se **analiza** (BPM, beatgrid y forma de onda). El BPM queda guardado y aparece en el navegador.
 
@@ -84,6 +84,12 @@ Un WAV de 24 bits ocupa unos 17 MB por minuto (alrededor de 1 GB por hora).
 
 Próximamente: mapeos listos para los controladores más populares y luces (LED) del controlador.
 
+## Android (alfa)
+- Instala el archivo `.apk` (Ajustes → permitir instalar apps de orígenes desconocidos para tu navegador o administrador de archivos).
+- Al abrirla por primera vez, acepta el permiso de **música y audio**; la biblioteca usa la carpeta **Music** del dispositivo.
+- La interfaz es la misma del escritorio: se ve mejor en **tableta en horizontal**; en teléfono puedes desplazarla hacia arriba y abajo. Una interfaz táctil dedicada llegará más adelante.
+- Las grabaciones se guardan en la carpeta privada de la app.
+
 ## 8. Atajos de teclado
 | Tecla | Acción |
 |---|---|
@@ -98,8 +104,8 @@ Próximamente: mapeos listos para los controladores más populares y luces (LED)
 
 ## 9. Solución de problemas
 - **"Sin dispositivo de audio"**: el sistema no encontró tarjeta de sonido; la interfaz funciona pero en silencio. Conecta una salida de audio y reinicia la app.
-- **Una pista no carga**: en esta versión se leen MP3, WAV, FLAC y OGG. AAC/M4A y video llegarán con el decodificador FFmpeg.
+- **Una pista no carga**: se leen MP3, WAV, FLAC, OGG, AAC/M4A y AIFF. Los archivos con protección de copia (DRM, p. ej. compras antiguas de iTunes o descargas de Apple Music/Spotify) no se pueden abrir. En Linux, AAC/M4A requiere las bibliotecas de FFmpeg (se instalan con el paquete). En Android, por ahora, sólo MP3, WAV, FLAC y OGG.
 - **macOS dice que no puede abrir la app**: intenta abrirla una vez, luego ve a *Ajustes del Sistema → Privacidad y seguridad* y pulsa **Abrir de todos modos** (la app aún no está notarizada por Apple).
 
 ## 10. Próximamente
-Más efectos, stems con IA, AAC/M4A, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).
+Más efectos, stems con IA, interfaz para teléfono, video y karaoke, grabación y Android. Ver el [plan de trabajo](04-PLAN-DE-TRABAJO.md).

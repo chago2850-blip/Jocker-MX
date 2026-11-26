@@ -305,6 +305,105 @@ void readOgg(QFile& f, TrackTags& t) {
     }
 }
 
+// MP4/M4A: átomos moov/mvhd (duración) y moov/udta/meta/ilst (etiquetas estilo iTunes)
+void parseIlst(const QByteArray& b, TrackTags& t) {
+    int pos = 0;
+    while (pos + 8 <= b.size()) {
+        const uint32_t sz = be32(reinterpret_cast<const uchar*>(b.constData()) + pos);
+        if (sz < 8 || pos + static_cast<int>(sz) > b.size()) break;
+        const QByteArray name = b.mid(pos + 4, 4);
+        const QByteArray item = b.mid(pos + 8, static_cast<int>(sz) - 8);
+        QByteArray value;
+        QString freeName;
+        int ip = 0;
+        while (ip + 8 <= item.size()) {
+            const uint32_t isz = be32(reinterpret_cast<const uchar*>(item.constData()) + ip);
+            if (isz < 8 || ip + static_cast<int>(isz) > item.size()) break;
+            const QByteArray iname = item.mid(ip + 4, 4);
+            if (iname == "data" && isz >= 16) value = item.mid(ip + 16, static_cast<int>(isz) - 16);
+            else if (iname == "name" && isz >= 12) freeName = QString::fromUtf8(item.mid(ip + 12, static_cast<int>(isz) - 12));
+            ip += static_cast<int>(isz);
+        }
+        const QString text = QString::fromUtf8(value).trimmed();
+        if (name == "\xA9" "nam") applyField(t, "TITLE", text);
+        else if (name == "\xA9" "ART" || name == "aART") applyField(t, "ARTIST", text);
+        else if (name == "\xA9" "alb") applyField(t, "ALBUM", text);
+        else if (name == "\xA9" "gen") applyField(t, "GENRE", text);
+        else if (name == "\xA9" "day") applyField(t, "DATE", text);
+        else if (name == "gnre" && value.size() >= 2) {
+            const int g = (static_cast<uchar>(value[0]) << 8 | static_cast<uchar>(value[1])) - 1;
+            if (g >= 0) applyField(t, "GENRE", QString::number(g));
+        } else if (name == "tmpo" && value.size() >= 2) {
+            const int bpm = static_cast<uchar>(value[0]) << 8 | static_cast<uchar>(value[1]);
+            if (bpm > 0) applyField(t, "BPM", QString::number(bpm));
+        } else if (name == "----" && freeName.compare("initialkey", Qt::CaseInsensitive) == 0) {
+            applyField(t, "KEY", text);
+        } else if (name == "----" && freeName.compare("BPM", Qt::CaseInsensitive) == 0) {
+            applyField(t, "BPM", text);
+        }
+        pos += static_cast<int>(sz);
+    }
+}
+
+void parseMp4Box(const QByteArray& b, TrackTags& t, int depth) {
+    int pos = 0;
+    while (pos + 8 <= b.size() && depth < 8) {
+        uint32_t sz = be32(reinterpret_cast<const uchar*>(b.constData()) + pos);
+        if (sz == 0) sz = static_cast<uint32_t>(b.size() - pos);
+        if (sz < 8 || pos + static_cast<int>(sz) > b.size()) break;
+        const QByteArray name = b.mid(pos + 4, 4);
+        const QByteArray body = b.mid(pos + 8, static_cast<int>(sz) - 8);
+        if (name == "mvhd" && body.size() >= 20) {
+            const auto* p = reinterpret_cast<const uchar*>(body.constData());
+            const int ver = p[0];
+            double timescale = 0, dur = 0;
+            if (ver == 1 && body.size() >= 32) {
+                timescale = be32(p + 20);
+                dur = double((uint64_t(be32(p + 24)) << 32) | be32(p + 28));
+            } else {
+                timescale = be32(p + 12);
+                dur = be32(p + 16);
+            }
+            if (timescale > 0) t.duration = dur / timescale;
+        } else if (name == "udta" || name == "trak" || name == "mdia") {
+            if (name == "udta") parseMp4Box(body, t, depth + 1);
+        } else if (name == "meta" && body.size() > 4) {
+            parseMp4Box(body.mid(4), t, depth + 1);    // "meta" es una caja completa (versión + banderas)
+        } else if (name == "ilst") {
+            parseIlst(body, t);
+        }
+        pos += static_cast<int>(sz);
+    }
+}
+
+void readMp4(QFile& f, TrackTags& t) {
+    // Buscar "moov" entre las cajas de primer nivel
+    qint64 pos = 0;
+    while (pos + 8 <= f.size()) {
+        f.seek(pos);
+        const QByteArray h = f.read(16);
+        if (h.size() < 8) break;
+        uint64_t sz = be32(reinterpret_cast<const uchar*>(h.constData()));
+        const QByteArray name = h.mid(4, 4);
+        int hdr = 8;
+        if (sz == 1 && h.size() >= 16) {
+            sz = (uint64_t(be32(reinterpret_cast<const uchar*>(h.constData()) + 8)) << 32) |
+                 be32(reinterpret_cast<const uchar*>(h.constData()) + 12);
+            hdr = 16;
+        } else if (sz == 0) {
+            sz = static_cast<uint64_t>(f.size() - pos);
+        }
+        if (sz < 8) break;
+        if (name == "moov") {
+            if (sz > 64ull * 1024 * 1024) break;
+            f.seek(pos + hdr);
+            parseMp4Box(f.read(static_cast<qint64>(sz) - hdr), t, 0);
+            break;
+        }
+        pos += static_cast<qint64>(sz);
+    }
+}
+
 } // namespace
 
 TrackTags readTags(const QString& path) {
@@ -316,6 +415,7 @@ TrackTags readTags(const QString& path) {
     if (magic.startsWith("fLaC")) readFlac(f, t);
     else if (magic.startsWith("RIFF")) readWav(f, t);
     else if (magic.startsWith("OggS")) readOgg(f, t);
+    else if (magic.mid(4, 4) == "ftyp") readMp4(f, t);
     else readMp3(f, t);
     if (t.bpm > 0 && (t.bpm < 30 || t.bpm > 300)) t.bpm = 0;
     return t;

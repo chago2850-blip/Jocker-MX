@@ -5,6 +5,7 @@
 // Genera sus propias pistas sintéticas (no requiere archivos externos).
 #include "analysis/Analyzer.h"
 #include "analysis/KeyDetector.h"
+#include "analysis/PlatformDecoder.h"
 #include "app/DeckController.h"
 #include "app/Mixer.h"
 #include "app/RecordingController.h"
@@ -20,6 +21,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <random>
 #include <vector>
@@ -473,6 +475,32 @@ int main(int argc, char** argv) {
         const QString cueText = QString::fromUtf8(cue.readAll());
         CHECK(list.contains("t124") && cueText.contains("TRACK 01") && cueText.contains("INDEX 01 00:00"),
               "lista de canciones (.txt) y hoja .cue generadas");
+    }
+
+    std::printf("\n[13] AAC / M4A (%s)\n", jx::platformDecoderName());
+    {
+        const QString m4a = QStringLiteral(JX_TEST_DATA_DIR) + "/prueba-aac.m4a";
+        const jx::TrackTags tg = jx::readTags(m4a);
+        CHECK(tg.title == "Tono de Prueba" && tg.artist == "Jocker-MX" && tg.album == "Pruebas" && tg.genre == "House",
+              "etiquetas MP4: %s / %s / %s / %s", qPrintable(tg.title), qPrintable(tg.artist), qPrintable(tg.album), qPrintable(tg.genre));
+        CHECK(std::abs(tg.duration - 6.0) < 0.1, "duración MP4 (mvhd): %.2f s", tg.duration);
+        if (std::strlen(jx::platformDecoderName()) > 0) {
+            QString err;
+            auto t = jx::loadAndAnalyze(m4a, sr, &err);
+            CHECK(t != nullptr, "decodifica AAC con %s (%s)", jx::platformDecoderName(), qPrintable(err));
+            if (t) {
+                CHECK(std::abs(t->durationSec() - 6.0) < 0.15, "duración decodificada %.2f s", t->durationSec());
+                CHECK(std::abs(t->bpm - 124.0) < 0.5, "BPM de la pista AAC: %.2f", t->bpm);
+                std::vector<float> v(t->pcm.begin(), t->pcm.end());
+                CHECK(rms(v) > 0.05, "audio AAC con señal (RMS %.3f)", rms(v));
+            }
+        } else {
+            std::printf("  (sin decodificador del sistema en esta compilación)\n");
+        }
+        std::vector<float> mono = {0.5f, -0.5f, 0.25f, 0.f};
+        std::vector<float> st;
+        CHECK(jx::convertToStereo(mono.data(), 4, 1, 48000, 48000, st) && st.size() == 8 && st[0] == st[1],
+              "conversión mono → estéreo");
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

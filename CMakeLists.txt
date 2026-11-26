@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.4.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.4.0-dev")
+project(JockerMX VERSION 0.5.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.5.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,6 +13,9 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Sql)
+if(ANDROID)
+  find_package(Qt6 REQUIRED COMPONENTS CorePrivate)
+endif()
 qt_standard_project_setup()
 
 # --- Terceros ---------------------------------------------------------------
@@ -56,6 +59,26 @@ else()
   endif()
 endif()
 
+# Decodificador del sistema para AAC/M4A (AudioToolbox / Media Foundation / FFmpeg)
+add_library(jxplatformdec INTERFACE)
+if(APPLE)
+  target_link_libraries(jxplatformdec INTERFACE "-framework AudioToolbox" "-framework CoreFoundation")
+elseif(WIN32)
+  target_link_libraries(jxplatformdec INTERFACE mfplat mfreadwrite mfuuid ole32)
+elseif(NOT ANDROID)
+  find_package(PkgConfig)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(FFMPEG IMPORTED_TARGET libavformat libavcodec libavutil libswresample)
+  endif()
+  if(FFMPEG_FOUND)
+    target_compile_definitions(jxplatformdec INTERFACE JX_HAVE_FFMPEG)
+    target_link_libraries(jxplatformdec INTERFACE PkgConfig::FFMPEG)
+    message(STATUS "AAC/M4A mediante FFmpeg ${FFMPEG_libavcodec_VERSION}")
+  else()
+    message(WARNING "FFmpeg no encontrado: sin soporte AAC/M4A en Linux")
+  endif()
+endif()
+
 # --- Aplicación -------------------------------------------------------------
 qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/main.cpp
@@ -68,6 +91,7 @@ qt_add_executable(jocker-mx WIN32 MACOSX_BUNDLE
   src/engine/Recorder.h src/engine/Recorder.cpp
   src/analysis/Analyzer.h src/analysis/Analyzer.cpp
   src/analysis/KeyDetector.h src/analysis/KeyDetector.cpp
+  src/analysis/PlatformDecoder.h src/analysis/PlatformDecoder.cpp
   src/library/TagReader.h src/library/TagReader.cpp
   src/library/LibraryDb.h src/library/LibraryDb.cpp
 )
@@ -113,7 +137,7 @@ if(MSVC)
   target_compile_definitions(jocker-mx PRIVATE _USE_MATH_DEFINES NOMINMAX)
 endif()
 target_link_libraries(jocker-mx PRIVATE
-  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi)
+  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
 
 set_target_properties(jocker-mx PROPERTIES
   OUTPUT_NAME "jocker-mx"
@@ -131,6 +155,19 @@ if(APPLE)
 endif()
 if(WIN32)
   target_sources(jocker-mx PRIVATE packaging/windows/jocker-mx.rc)
+endif()
+
+# --- Android ---------------------------------------------------------------
+if(ANDROID)
+  set_target_properties(jocker-mx PROPERTIES
+    QT_ANDROID_PACKAGE_NAME "org.jockermx.app"
+    QT_ANDROID_APP_NAME "Jocker-MX"
+    QT_ANDROID_VERSION_NAME "${JOCKER_VERSION_STRING}"
+    QT_ANDROID_VERSION_CODE 5
+    QT_ANDROID_TARGET_SDK_VERSION 34
+    QT_ANDROID_MIN_SDK_VERSION 28
+    QT_ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/android")
+  target_link_libraries(jocker-mx PRIVATE Qt6::CorePrivate)
 endif()
 
 # --- Instalación y paquetes -------------------------------------------------
@@ -190,7 +227,7 @@ set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
 set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
 set(CPACK_RPM_PACKAGE_AUTOREQ OFF)
-set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.4, qt6-qtdeclarative >= 6.4")
+set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase >= 6.4, qt6-qtdeclarative >= 6.4, (libavcodec-free or ffmpeg-libs), (libavformat-free or ffmpeg-libs), (libswresample-free or ffmpeg-libs)")
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION /usr/share/applications /usr/share/icons /usr/share/icons/hicolor)
 # Windows (NSIS)
 set(CPACK_NSIS_DISPLAY_NAME "Jocker-MX")
@@ -209,7 +246,7 @@ if(JOCKER_BUILD_TESTS)
   add_executable(jx-tests
     tests/engine_tests.cpp
     src/engine/Deck.cpp src/engine/AudioEngine.cpp src/engine/Effects.cpp src/engine/Sampler.cpp src/engine/Recorder.cpp
-    src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp
+    src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/PlatformDecoder.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/app/DeckController.h src/app/DeckController.cpp
     src/app/Mixer.h src/app/Mixer.cpp
@@ -217,9 +254,10 @@ if(JOCKER_BUILD_TESTS)
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
+  target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data")
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()
-  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi)
+  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
   add_test(NAME motor COMMAND jx-tests)
 endif()

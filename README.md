@@ -10,13 +10,13 @@ Windows · Linux · macOS · Android — <a href="LICENSE">GPL-3.0-or-later</a><
 
 **Jocker-MX** es una aplicación DJ de código abierto que busca ofrecer **las mismas funciones y capacidades que VirtualDJ 2026**, incluidas las que allí requieren licencia PRO o Business (cualquier controlador, uso profesional, IA avanzada, sin marcas de agua, multiusuario), pero **gratis, libre y en cuatro plataformas**.
 
-> **Estado: 0.4.0-dev (alfa).** Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-040-dev).
+> **Estado: 0.5.0-dev (alfa).** Ahora también lee **AAC/M4A** y hay una primera **APK para Android**. Funcionan 2 decks, mezclador, sync, key lock, cues, loops, scratch, formas de onda, biblioteca con base de datos, controladores MIDI, tonalidad Camelot, 6 efectos sincronizados, **sampler de 8 pads** y **grabación de la mezcla con lista de canciones**. Ver [lo que ya funciona](#lo-que-ya-funciona-en-050-dev).
 
 <p align="center"><img src="assets/screenshots/jocker-mx-0.1.png" alt="Captura de Jocker-MX" width="100%"></p>
 <p align="center"><img src="assets/screenshots/jocker-mx-sampler.png" alt="Sampler de Jocker-MX" width="49%"> <img src="assets/screenshots/jocker-mx-midi.png" alt="Controladores MIDI" width="49%"></p>
 
-## Lo que ya funciona en 0.4.0-dev
-- **2 decks** con carga de **MP3, WAV, FLAC y OGG** (arrastrar y soltar o botones A/B del navegador).
+## Lo que ya funciona en 0.5.0-dev
+- **2 decks** con carga de **MP3, WAV, FLAC, OGG, AAC/M4A y AIFF** (arrastrar y soltar o botones A/B del navegador).
 - **Análisis automático de BPM y beatgrid** (error típico < 3 ms en pruebas).
 - **Pitch** ±8/16/25/50/100 %, **key lock** (Rubber Band), **SYNC** (tempo + fase) y **LOCK** (sync continuo), *nudge*.
 - **CUE** estilo CDJ (con vista previa mientras se mantiene), **8 hot cues** que se guardan por pista (clic derecho = borrar), **cuantización**.
@@ -45,7 +45,7 @@ Descarga el instalador de tu sistema en [Releases](https://github.com/chago2850-
 | Windows 10/11 | instalador `.exe` o `.zip` portátil |
 | Ubuntu 24.04+ / Debian 13+ | `.deb` → `sudo apt install ./jocker-mx_*.deb` |
 | Fedora 40+ | `.rpm` → `sudo dnf install ./jocker-mx-*.rpm` |
-| Android | en desarrollo (fase F11) |
+| Android 9+ (ARM64) | `.apk` (alfa; pensada para tableta en horizontal) — permite instalar «apps desconocidas» |
 
 ### Compilar desde el código
 ```bash

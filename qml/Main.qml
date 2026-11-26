@@ -51,8 +51,19 @@ ApplicationWindow {
         }
     }
 
-    ColumnLayout {
+    // En pantallas pequeñas (teléfonos) la interfaz completa se desplaza verticalmente
+    Flickable {
+        id: scroller
         anchors.fill: parent
+        contentWidth: width
+        contentHeight: Math.max(height, 940)
+        interactive: contentHeight > height + 1
+        boundsBehavior: Flickable.StopAtBounds
+        clip: true
+
+    ColumnLayout {
+        width: scroller.width
+        height: scroller.contentHeight
         spacing: 0
 
         TopBar { Layout.fillWidth: true; onOpenMidi: midiDialog.open() }
@@ -151,5 +162,6 @@ ApplicationWindow {
             LibraryPanel {}
             SamplerPanel {}
         }
+    }
     }
 }

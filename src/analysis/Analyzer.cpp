@@ -3,6 +3,7 @@
 #include "Analyzer.h"
 
 #include "KeyDetector.h"
+#include "PlatformDecoder.h"
 #include "library/TagReader.h"
 #include "miniaudio.h"
 
@@ -26,32 +27,8 @@ void guessTitleArtist(const QString& path, QString* title, QString* artist) {
     }
 }
 
-bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error) {
-    ma_decoder dec;
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, static_cast<ma_uint32>(sampleRate));
-#ifdef _WIN32
-    const ma_result r = ma_decoder_init_file_w(reinterpret_cast<const wchar_t*>(path.utf16()), &cfg, &dec);
-#else
-    const ma_result r = ma_decoder_init_file(path.toUtf8().constData(), &cfg, &dec);
-#endif
-    if (r != MA_SUCCESS) {
-        if (error) *error = QStringLiteral("Formato no soportado o archivo dañado");
-        return false;
-    }
+bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error, double maxSeconds) {
     pcm.clear();
-    std::vector<float> chunk(16384 * 2);
-    for (;;) {
-        ma_uint64 got = 0;
-        const ma_result rr = ma_decoder_read_pcm_frames(&dec, chunk.data(), 16384, &got);
-        if (got > 0) pcm.insert(pcm.end(), chunk.begin(), chunk.begin() + static_cast<long>(got * 2));
-        if (rr != MA_SUCCESS || got == 0) break;
-        if (pcm.size() > static_cast<size_t>(sampleRate * 2 * 600)) break;   // máximo 10 min
-    }
-    ma_decoder_uninit(&dec);
-    return !pcm.empty();
-}
-
-std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QString* error) {
     ma_decoder dec;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, static_cast<ma_uint32>(sampleRate));
     cfg.resampling.linear.lpfOrder = 8;
@@ -61,13 +38,36 @@ std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QS
     const ma_result r = ma_decoder_init_file(path.toUtf8().constData(), &cfg, &dec);
 #endif
     if (r != MA_SUCCESS) {
-        if (error) *error = QStringLiteral("Formato no soportado o archivo dañado (%1)").arg(ma_result_description(r));
-        return nullptr;
+        // AAC/M4A, ALAC, WMA…: decodificador del sistema
+        if (platformDecode(path, sampleRate, pcm, error)) {
+            const size_t maxSamples = static_cast<size_t>(sampleRate * 2 * maxSeconds);
+            if (pcm.size() > maxSamples) pcm.resize(maxSamples);
+            return true;
+        }
+        if (error && error->isEmpty()) *error = QStringLiteral("Formato no soportado o archivo dañado");
+        return false;
     }
+    ma_uint64 total = 0;
+    if (ma_decoder_get_length_in_pcm_frames(&dec, &total) == MA_SUCCESS && total > 0)
+        pcm.reserve(static_cast<size_t>(total) * 2 + 8192);
+    std::vector<float> chunk(16384 * 2);
+    const size_t maxSamples = static_cast<size_t>(sampleRate * 2 * maxSeconds);
+    for (;;) {
+        ma_uint64 got = 0;
+        const ma_result rr = ma_decoder_read_pcm_frames(&dec, chunk.data(), 16384, &got);
+        if (got > 0) pcm.insert(pcm.end(), chunk.begin(), chunk.begin() + static_cast<long>(got * 2));
+        if (rr != MA_SUCCESS || got == 0 || pcm.size() >= maxSamples) break;
+    }
+    ma_decoder_uninit(&dec);
+    if (pcm.empty() && error) *error = QStringLiteral("El archivo no contiene audio");
+    return !pcm.empty();
+}
 
+std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QString* error) {
     auto t = std::make_unique<Track>();
     t->path = path;
     t->sampleRate = sampleRate;
+    if (!decodeToStereo(path, sampleRate, t->pcm, error, 4 * 3600.0)) return nullptr;
     guessTitleArtist(path, &t->title, &t->artist);
     const TrackTags tags = readTags(path);
     if (!tags.title.isEmpty()) t->title = tags.title;
@@ -75,19 +75,6 @@ std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QS
     t->album = tags.album;
     t->genre = tags.genre;
     t->musicalKey = normalizeKeyToCamelot(tags.key);
-
-    ma_uint64 total = 0;
-    if (ma_decoder_get_length_in_pcm_frames(&dec, &total) == MA_SUCCESS && total > 0)
-        t->pcm.reserve(static_cast<size_t>(total) * 2 + 8192);
-
-    std::vector<float> chunk(16384 * 2);
-    for (;;) {
-        ma_uint64 got = 0;
-        const ma_result rr = ma_decoder_read_pcm_frames(&dec, chunk.data(), 16384, &got);
-        if (got > 0) t->pcm.insert(t->pcm.end(), chunk.begin(), chunk.begin() + static_cast<long>(got * 2));
-        if (rr != MA_SUCCESS || got == 0) break;
-    }
-    ma_decoder_uninit(&dec);
 
     t->frames = static_cast<int64_t>(t->pcm.size() / 2);
     if (t->frames < static_cast<int64_t>(sampleRate * 0.1)) {

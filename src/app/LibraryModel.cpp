@@ -141,7 +141,8 @@ void LibraryModel::rescan() {
     m_watcher.setFuture(QtConcurrent::run([root, counter, self]() {
         const QString prefix = root + '/';
         const QHash<QString, qint64> known = LibraryDb::knownMtimes(prefix);
-        static const QStringList exts = {"*.mp3", "*.wav", "*.flac", "*.wave", "*.ogg", "*.oga", "*.MP3", "*.WAV", "*.FLAC", "*.OGG"};
+        static const QStringList exts = {"*.mp3", "*.wav", "*.flac", "*.wave", "*.ogg", "*.oga", "*.m4a", "*.aac", "*.mp4", "*.aif", "*.aiff",
+                                         "*.MP3", "*.WAV", "*.FLAC", "*.OGG", "*.M4A", "*.AAC", "*.AIF", "*.AIFF"};
         QDirIterator it(root, exts, QDir::Files, QDirIterator::Subdirectories | QDirIterator::FollowSymlinks);
         QSet<QString> present;
         QList<ScanEntry> batch;

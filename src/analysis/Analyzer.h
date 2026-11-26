@@ -21,7 +21,8 @@ struct BeatInfo {
 std::unique_ptr<Track> loadAndAnalyze(const QString& path, double sampleRate, QString* error);
 
 // Sólo decodifica a estéreo float (para muestras del sampler).
-bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error);
+bool decodeToStereo(const QString& path, double sampleRate, std::vector<float>& pcm, QString* error,
+                    double maxSeconds = 600.0);
 
 // Detección de tempo y fase del primer beat sobre audio estéreo intercalado.
 BeatInfo detectBeats(const float* pcm, int64_t frames, double sampleRate);

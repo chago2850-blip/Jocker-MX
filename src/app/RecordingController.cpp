@@ -19,8 +19,14 @@ RecordingController::RecordingController(AudioEngine* engine, QList<DeckControll
     : QObject(parent), m_engine(engine), m_decks(std::move(decks)) {
     QSettings s;
     m_folder = s.value("recording/folder").toString();
-    if (m_folder.isEmpty())
+    if (m_folder.isEmpty()) {
+#ifdef Q_OS_ANDROID
+        // En Android las apps sólo pueden escribir libremente en su propia carpeta
+        m_folder = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/Grabaciones";
+#else
         m_folder = QStandardPaths::writableLocation(QStandardPaths::MusicLocation) + "/Jocker-MX Grabaciones";
+#endif
+    }
     for (DeckController* d : m_decks) {
         connect(d, &DeckController::played, this, [this, d](const QString& p) { onPlayed(d->index(), p); });
     }

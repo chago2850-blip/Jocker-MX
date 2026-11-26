@@ -25,7 +25,8 @@ jobs:
             qml6-module-qtquick qml6-module-qtquick-controls qml6-module-qtquick-layouts \
             qml6-module-qtquick-dialogs qml6-module-qtquick-window qml6-module-qtqml-workerscript \
             qml6-module-qtquick-templates qml6-module-qt-labs-folderlistmodel \
-            libqt6sql6-sqlite libasound2-dev
+            libqt6sql6-sqlite libasound2-dev \
+            libavformat-dev libavcodec-dev libavutil-dev libswresample-dev pkg-config
       - name: Compilar
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -91,10 +92,56 @@ jobs:
           name: jocker-mx-macos
           path: build/*.dmg
 
+  android:
+    name: Android (APK)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.*"
+          host: linux
+          target: android
+          arch: android_arm64_v8a
+          autodesktop: true
+          cache: true
+      - name: NDK
+        run: |
+          NDK_VER=26.1.10909125
+          if [ ! -d "$ANDROID_SDK_ROOT/ndk/$NDK_VER" ]; then
+            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "ndk;$NDK_VER" > /dev/null
+          fi
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/$NDK_VER" >> "$GITHUB_ENV"
+      - name: Compilar
+        run: |
+          sudo apt-get install -y ninja-build
+          "$QT_ROOT_DIR/bin/qt-cmake" -S . -B build-android -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+            -DJOCKER_BUILD_TESTS=OFF -DQT_ANDROID_BUILD_ALL_ABIS=OFF
+          cmake --build build-android --target apk
+      - name: Firmar APK
+        run: |
+          APK=$(find build-android -name "*-release-unsigned.apk" -o -name "*-release.apk" | head -1)
+          echo "APK generado: $APK"
+          BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          keytool -genkeypair -keystore jx.keystore -storepass jockermx -keypass jockermx -alias jockermx \
+            -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Jocker-MX, O=Jocker-MX, C=MX"
+          "$BT/zipalign" -f 4 "$APK" aligned.apk
+          "$BT/apksigner" sign --ks jx.keystore --ks-pass pass:jockermx --out "jocker-mx-${GITHUB_REF_NAME//\//-}-android-arm64.apk" aligned.apk
+          ls -la *.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jocker-mx-android
+          path: jocker-mx-*-android-arm64.apk
+
   release:
     name: Publicar versión
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, windows, macos]
+    needs: [linux, windows, macos, android]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
@@ -111,4 +158,4 @@ jobs:
             - **Windows**: `jocker-mx-…-Windows.exe` (instalador) o `.zip` (portátil)
             - **macOS** (Apple Silicon e Intel): `.dmg` — arrastra Jocker-MX a Aplicaciones. Como aún no está notarizada por Apple, la primera vez ábrela y luego ve a *Ajustes del Sistema → Privacidad y seguridad → Abrir de todos modos*
             - **Linux**: `.deb` (Ubuntu 24.04+, Debian 13+) o `.rpm` (Fedora)
-            - **Android**: en desarrollo (fase F11)
+            - **Android** (alfa, ARM64, mejor en tableta en horizontal): `…-android-arm64.apk` — instálalo permitiendo «orígenes desconocidos»

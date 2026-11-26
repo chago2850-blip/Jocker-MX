@@ -19,6 +19,17 @@ StemsService::StemsService() {
     m_pool.setThreadPriority(QThread::LowPriority);
 }
 
+// Al cerrar la app: cancelar la separación en curso y esperarla antes de destruir la caché.
+StemsService::~StemsService() {
+    {
+        QMutexLocker lock(&m_cacheMutex);
+        for (const auto& w : m_jobs)
+            if (auto j = w.lock()) j->cancel.store(true);
+    }
+    m_pool.clear();
+    m_pool.waitForDone();
+}
+
 bool StemsService::ensureModel(QString* error) {
     QMutexLocker lock(&m_modelMutex);
     if (m_model.isLoaded()) return true;
@@ -49,6 +60,11 @@ std::shared_ptr<StemsService::Job> StemsService::separate(std::shared_ptr<Track>
             }
         }
     }
+    {
+        QMutexLocker lock(&m_cacheMutex);
+        m_jobs.removeIf([](const std::weak_ptr<Job>& w) { return w.expired(); });
+        m_jobs << job;
+    }
     QPointer<QObject> ctx(context);
     QtConcurrent::run(&m_pool, [this, track, job, ctx, done]() {
         QString err;
@@ -59,7 +75,7 @@ std::shared_ptr<StemsService::Job> StemsService::separate(std::shared_ptr<Track>
                 separateStems(m_model, track->pcm.data(), track->frames, track->sampleRate, threads,
                               [job](double p) { job->progress.store(p); }, &job->cancel, &err).release());
         }
-        if (sd) {
+        if (sd && !job->cancel.load()) {
             QMutexLocker lock(&m_cacheMutex);
             m_cache.insert(track->path + QString::number(track->sampleRate), sd);
         }

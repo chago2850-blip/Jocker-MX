@@ -18,7 +18,7 @@ Rectangle {
     }
     function fmtLong(s) {
         var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
-        return h > 0 ? (h + " h " + m + " min") : (m + " min")
+        return h > 0 ? (h + " h " + m + " min") : (m > 0 ? m + " min" : Math.round(s) + " s")
     }
 
     JxPrompt {

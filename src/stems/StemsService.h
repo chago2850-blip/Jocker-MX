@@ -6,6 +6,7 @@
 #include "engine/Track.h"
 
 #include <QHash>
+#include <QList>
 #include <QMutex>
 #include <QObject>
 #include <QThreadPool>
@@ -40,6 +41,7 @@ public:
 
 private:
     StemsService();
+    ~StemsService() override;
     bool ensureModel(QString* error);
 
     QString m_modelPath;
@@ -48,6 +50,7 @@ private:
     QThreadPool m_pool;
     QMutex m_cacheMutex;
     QHash<QString, std::weak_ptr<StemData>> m_cache;   // pistas ya separadas aún en memoria
+    QList<std::weak_ptr<Job>> m_jobs;                   // para cancelarlos al cerrar (bajo m_cacheMutex)
 };
 
 } // namespace jx

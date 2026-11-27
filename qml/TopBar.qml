@@ -23,6 +23,29 @@ Rectangle {
         Text { text: appVersion; color: Theme.faint; font.pixelSize: 11; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 12 }
         Item { Layout.fillWidth: true }
 
+        Rectangle {     // Transmisión en vivo
+            visible: broadcast.onAir
+            Layout.preferredHeight: 28; Layout.preferredWidth: liveTxt.implicitWidth + 34
+            radius: 6
+            readonly property bool live: broadcast.state === 2
+            color: live ? Qt.rgba(1, 0.25, 0.35, 0.18) : "transparent"
+            border.color: live ? Theme.red : Theme.gold
+            Rectangle {
+                id: liveDot
+                width: 10; height: 10; radius: 5
+                anchors.left: parent.left; anchors.leftMargin: 9; anchors.verticalCenter: parent.verticalCenter
+                color: parent.live ? Theme.red : Theme.gold
+                SequentialAnimation on opacity { running: broadcast.state === 2; loops: Animation.Infinite
+                    NumberAnimation { to: 0.3; duration: 600 } NumberAnimation { to: 1; duration: 600 } }
+            }
+            Text {
+                id: liveTxt
+                anchors.left: liveDot.right; anchors.leftMargin: 7; anchors.verticalCenter: parent.verticalCenter
+                text: parent.live ? "EN VIVO" : "RECONECTANDO"
+                color: parent.live ? Theme.red : Theme.gold
+                font.pixelSize: 11; font.weight: Font.Black
+            }
+        }
         Rectangle {     // Automix
             Layout.preferredHeight: 28; Layout.preferredWidth: amTxt.implicitWidth + 34
             radius: 6

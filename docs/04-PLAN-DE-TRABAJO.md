@@ -89,6 +89,7 @@ Las fases se solapan; la columna "Meses" indica la ventana principal.
 ### F9 · Grabación, transmisión, red y público (meses 15-19)
 - Grabación audio/video, *split* automático, cue sheet.
 - Icecast/Shoutcast, servidor de radio integrado, RTMP/SRT/WHIP con overlays.
+  - ✅ **0.12.0-dev**: transmisión a Icecast 2 (PUT/SOURCE) y SHOUTcast v1/v2 en Opus (Ogg) o MP3, reconexión automática, títulos, estadísticas. Pendiente: servidor de radio integrado, RTMP/SRT/WHIP (video).
 - Ableton Link, JACK/PipeWire, micrófono con *talkover*, line-in con análisis en vivo.
 - **Jocker Remote** (Android + PWA) y **Pide-MX** (peticiones del público con QR).
 - DMX: OS2L, Art-Net, sACN.

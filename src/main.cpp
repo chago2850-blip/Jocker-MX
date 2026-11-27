@@ -7,6 +7,7 @@
 #include "app/AutomixController.h"
 #include "app/EventScheduler.h"
 #include "app/KaraokeController.h"
+#include "app/BroadcastController.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
@@ -26,7 +27,7 @@
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.11.0-dev"
+#define JOCKER_VERSION "0.12.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -48,10 +49,11 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optShot("screenshot", "Guardar captura de la ventana y salir", "png");
     QCommandLineOption optWait("wait", "Milisegundos antes de la captura", "ms", "2500");
     QCommandLineOption optLib("library", "Carpeta de música para el navegador", "carpeta");
-    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion, karaoke, video)", "nombre");
+    QCommandLineOption optPanel("panel", "Abrir un panel al iniciar (midi, sampler, automix, programacion, karaoke, video, envivo)", "nombre");
     QCommandLineOption optQueue("queue", "Agregar un archivo a la cola de Automix (se puede repetir)", "archivo");
     QCommandLineOption optAutomix("automix", "Encender el Automix al iniciar");
-    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix});
+    QCommandLineOption optBroadcast("broadcast", "Salir en vivo al iniciar (con la configuración guardada)");
+    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix, optBroadcast});
     cli.process(app);
 
     const int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/JockerMX/resources/fonts/Montserrat.ttf"));
@@ -79,6 +81,7 @@ int main(int argc, char* argv[]) {
     midi.setAutomix(&automix);
     jx::EventScheduler scheduler(&automix, &deckA, &deckB, &mixer, &recorder);
     jx::KaraokeController karaoke(&deckA, &deckB, &mixer);
+    jx::BroadcastController broadcast(&engine, &deckA, &deckB, &mixer);
     if (cli.isSet(optQueue)) { automix.clear(); automix.add(cli.values(optQueue)); }
     if (cli.isSet(optLib)) library.setFolder(cli.value(optLib));
     QObject::connect(&deckA, &jx::DeckController::trackLoaded, &library, &jx::LibraryModel::setAnalysis);
@@ -110,6 +113,7 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("automix"), &automix);
     qml.rootContext()->setContextProperty(QStringLiteral("scheduler"), &scheduler);
     qml.rootContext()->setContextProperty(QStringLiteral("karaoke"), &karaoke);
+    qml.rootContext()->setContextProperty(QStringLiteral("broadcast"), &broadcast);
     qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -123,6 +127,7 @@ int main(int argc, char* argv[]) {
     if (cli.isSet(optA)) deckA.load(cli.value(optA));
     if (cli.isSet(optB)) deckB.load(cli.value(optB));
     if (cli.isSet(optAutomix)) automix.setEnabled(true);
+    if (cli.isSet(optBroadcast)) broadcast.start();
     if (cli.isSet(optPlay)) {
         auto startWhenReady = [](jx::DeckController* d) {
             QObject::connect(d, &jx::DeckController::trackChanged, d, [d]() {

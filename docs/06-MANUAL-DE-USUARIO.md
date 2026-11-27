@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.11.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.12.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -151,6 +151,20 @@ En la biblioteca esas canciones llevan 🎤, y en el deck aparece el distintivo 
   Si sólo un deck tiene video, se muestra ese aunque el otro esté sonando. **Llenar pantalla** recorta para no dejar bandas negras; **Ajustar** muestra la imagen completa.
 - **📺 Pantalla del público**: es la misma ventana que la del karaoke. Muestra el karaoke cuando hay un cantante o suena una pista con gráficos/letra; si no, la mezcla de video; si no, la pantalla de espera.
 - Los videos de karaoke con la letra «quemada» en la imagen se usan como cualquier video; el tono (panel Karaoke) también funciona con ellos.
+
+## 5 sexies. Transmitir en vivo (radio por internet)
+Necesitas un servidor **Icecast 2** o **SHOUTcast** (propio o contratado con un proveedor de radio por internet), con su dirección, puerto y contraseña de fuente.
+1. Abre la pestaña **📡 En vivo** y elige **Icecast 2** o **SHOUTcast**.
+2. Escribe la **dirección del servidor**, el **puerto** y:
+   - Icecast: el **punto de montaje** (p. ej. `/jocker`), el **usuario** (normalmente `source`) y la **contraseña**.
+   - SHOUTcast: la **contraseña** (y, en SHOUTcast 2, el **ID del stream**, normalmente `1`). Jocker-MX envía al puerto siguiente al indicado, como pide SHOUTcast.
+3. **Formato**: **Opus** suena mejor con menos datos (96–128 kbps es excelente); **MP3** lo reproduce cualquier aparato. SHOUTcast sólo acepta MP3.
+4. Nombre, género, descripción y sitio web aparecen en los reproductores y, si marcas **Emisión pública**, en el directorio del servidor.
+5. Pulsa **📡 SALIR EN VIVO**. Se transmite exactamente lo que sale por el master (decks, efectos, sampler). En la barra superior aparece **EN VIVO**.
+- Si se cae internet o el servidor, Jocker-MX **se reconecta solo** cada pocos segundos y sigue desde el audio actual.
+- **Enviar el título**: manda «Artista - Título» de la pista que más se oye. En MP3 se actualiza en cuanto cambia; en Opus el título va al inicio de cada conexión.
+- Errores típicos: «Usuario o contraseña incorrectos», «El punto de montaje está en uso» (ya hay otra fuente conectada), «No se pudo conectar» (dirección o puerto equivocados, o un cortafuegos).
+- La configuración (incluida la contraseña) se guarda en este equipo. Desde la línea de comandos, `--broadcast` sale en vivo al abrir la app.
 
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:

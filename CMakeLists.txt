@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.11.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.11.0-dev")
+project(JockerMX VERSION 0.12.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.12.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Sql)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Concurrent Sql Network)
 qt_standard_project_setup()
 
 # --- Terceros ---------------------------------------------------------------
@@ -57,6 +57,29 @@ else()
     target_compile_definitions(rtmidi PUBLIC __RTMIDI_DUMMY__)
   endif()
 endif()
+
+# Codificadores para transmisión en vivo: Opus (BSD-3, sólo C genérico) y Shine MP3 (LGPL-2.0+)
+file(STRINGS third_party/opus/SOURCES.txt JX_OPUS_SOURCES)
+list(TRANSFORM JX_OPUS_SOURCES PREPEND third_party/opus/)
+add_library(jxopus STATIC ${JX_OPUS_SOURCES})
+target_include_directories(jxopus PUBLIC third_party/opus/include
+  PRIVATE third_party/opus/celt third_party/opus/silk third_party/opus/silk/float third_party/opus/src third_party/opus)
+target_compile_definitions(jxopus PRIVATE OPUS_BUILD USE_ALLOCA)
+if(NOT MSVC)
+  target_compile_definitions(jxopus PRIVATE HAVE_LRINTF HAVE_LRINT)
+  target_compile_options(jxopus PRIVATE -w)
+endif()
+set_target_properties(jxopus PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(UNIX AND NOT APPLE)
+  target_link_libraries(jxopus PRIVATE m)
+endif()
+file(GLOB JX_SHINE_SOURCES third_party/shine/*.c)
+add_library(jxshine STATIC ${JX_SHINE_SOURCES})
+target_include_directories(jxshine PUBLIC third_party/shine)
+if(NOT MSVC)
+  target_compile_options(jxshine PRIVATE -w)
+endif()
+set_target_properties(jxshine PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Decodificador del sistema para AAC/M4A (AudioToolbox / Media Foundation / FFmpeg)
 add_library(jxplatformdec INTERFACE)
@@ -127,6 +150,9 @@ qt_add_qml_module(jocker-mx
     src/karaoke/Lrc.h src/karaoke/Lrc.cpp
     src/video/DeckVideo.h src/video/DeckVideo.cpp
     src/ui/VideoItem.h src/ui/VideoItem.cpp
+    src/broadcast/Encoders.h src/broadcast/Encoders.cpp
+    src/broadcast/Broadcaster.h src/broadcast/Broadcaster.cpp
+    src/app/BroadcastController.h src/app/BroadcastController.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
@@ -139,6 +165,8 @@ qt_add_qml_module(jocker-mx
     qml/Theme.qml
     qml/Stage.qml
     qml/VideoPanel.qml
+    qml/BroadcastPanel.qml
+    qml/JxField.qml
     qml/Knob.qml
     qml/JxButton.qml
     qml/VuMeter.qml
@@ -186,12 +214,12 @@ if(EXISTS "${JOCKER_STEMS_MODEL}")
 else()
   message(WARNING "Sin modelo de stems: la separación de voz/instrumentos estará desactivada")
 endif()
-target_compile_definitions(jocker-mx PRIVATE JOCKER_VERSION="${JOCKER_VERSION_STRING}")
+target_compile_definitions(jocker-mx PRIVATE JOCKER_VERSION="${JOCKER_VERSION_STRING}" JOCKER_BROADCAST_VERSION="${JOCKER_VERSION_STRING}")
 if(MSVC)
   target_compile_definitions(jocker-mx PRIVATE _USE_MATH_DEFINES NOMINMAX)
 endif()
 target_link_libraries(jocker-mx PRIVATE
-  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
+  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql Qt6::Network rubberband miniaudio rtmidi jxplatformdec jxopus jxshine)
 
 set_target_properties(jocker-mx PROPERTIES
   OUTPUT_NAME "jocker-mx"
@@ -313,6 +341,8 @@ if(JOCKER_BUILD_TESTS)
     src/analysis/Analyzer.cpp src/analysis/KeyDetector.cpp src/analysis/Structure.cpp src/analysis/PlatformDecoder.cpp
     src/karaoke/Cdg.cpp src/karaoke/Lrc.cpp
     src/video/DeckVideo.h src/video/DeckVideo.cpp
+    src/broadcast/Encoders.h src/broadcast/Encoders.cpp
+    src/broadcast/Broadcaster.h src/broadcast/Broadcaster.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp
@@ -325,11 +355,11 @@ if(JOCKER_BUILD_TESTS)
     src/app/EventScheduler.h src/app/EventScheduler.cpp
     src/app/KaraokeController.h src/app/KaraokeController.cpp)
   target_include_directories(jx-tests PRIVATE src src/app src/control)
-  target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY)
+  target_compile_definitions(jx-tests PRIVATE JX_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/tests/data" EIGEN_MPL2_ONLY JOCKER_BROADCAST_VERSION="${JOCKER_VERSION_STRING}")
   target_include_directories(jx-tests SYSTEM PRIVATE third_party/eigen)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()
-  target_link_libraries(jx-tests PRIVATE Qt6::Core Qt6::Gui Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
+  target_link_libraries(jx-tests PRIVATE jxopus jxshine Qt6::Network Qt6::Core Qt6::Gui Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
   add_test(NAME motor COMMAND jx-tests)
 endif()

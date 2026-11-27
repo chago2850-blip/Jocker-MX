@@ -14,6 +14,15 @@
 #include "karaoke/Cdg.h"
 #include "karaoke/Lrc.h"
 #include "video/DeckVideo.h"
+#include "broadcast/Broadcaster.h"
+#include "broadcast/Encoders.h"
+#include "miniaudio.h"
+#include <opus.h>
+#include <QTcpServer>
+#include <QTcpSocket>
+#include <QRandomGenerator>
+#include <functional>
+#include <memory>
 #include "app/AutomixPlan.h"
 #include "analysis/Structure.h"
 #include "app/RecordingController.h"
@@ -171,6 +180,114 @@ static double zeroCrossHz(const std::vector<float>& st, int sr) {
     int c = 0;
     for (size_t i = 2; i < st.size(); i += 2) if ((st[i - 2] < 0) != (st[i] < 0)) ++c;
     return c / 2.0 / (double(st.size() / 2) / sr);
+}
+
+
+// --- Ayudas para transmisión: separar páginas Ogg, decodificar Opus/MP3 y un servidor de prueba
+struct OggPacketList { std::vector<QByteArray> packets; bool crcOk = true; bool bosFirst = false; int pages = 0; int64_t lastGranule = -1; };
+static OggPacketList parseOgg(const QByteArray& d) {
+    OggPacketList r;
+    QByteArray cur;
+    int pos = 0;
+    while (pos + 27 <= d.size()) {
+        if (d.mid(pos, 4) != "OggS") { r.crcOk = false; break; }
+        const uint8_t flags = uint8_t(d[pos + 5]);
+        if (r.pages == 0) r.bosFirst = (flags & 2) != 0;
+        int64_t gran = 0;
+        for (int i = 0; i < 8; ++i) gran |= int64_t(uint8_t(d[pos + 6 + i])) << (8 * i);
+        const int nseg = uint8_t(d[pos + 26]);
+        if (pos + 27 + nseg > d.size()) break;
+        int body = 0;
+        for (int i = 0; i < nseg; ++i) body += uint8_t(d[pos + 27 + i]);
+        if (pos + 27 + nseg + body > d.size()) break;
+        QByteArray page = d.mid(pos, 27 + nseg + body);
+        uint32_t stored = 0;
+        for (int i = 0; i < 4; ++i) stored |= uint32_t(uint8_t(page[22 + i])) << (8 * i);
+        for (int i = 0; i < 4; ++i) page[22 + i] = 0;
+        if (jx::OggWriter::crc(reinterpret_cast<const uint8_t*>(page.constData()), size_t(page.size())) != stored) r.crcOk = false;
+        int off = pos + 27 + nseg;
+        for (int i = 0; i < nseg; ++i) {
+            const int l = uint8_t(d[pos + 27 + i]);
+            cur += d.mid(off, l);
+            off += l;
+            if (l < 255) { r.packets.push_back(cur); cur.clear(); }
+        }
+        if (gran >= 0) r.lastGranule = gran;
+        ++r.pages;
+        pos = off;
+    }
+    return r;
+}
+static std::vector<float> decodeOpusPackets(const std::vector<QByteArray>& pk, int preSkip) {
+    std::vector<float> out;
+    int err = 0;
+    OpusDecoder* dec = opus_decoder_create(48000, 2, &err);
+    if (!dec) return out;
+    std::vector<float> buf(5760 * 2);
+    for (size_t i = 2; i < pk.size(); ++i) {   // 0 = OpusHead, 1 = OpusTags
+        const int n = opus_decode_float(dec, reinterpret_cast<const unsigned char*>(pk[i].constData()), pk[i].size(), buf.data(), 5760, 0);
+        if (n > 0) out.insert(out.end(), buf.begin(), buf.begin() + n * 2);
+    }
+    opus_decoder_destroy(dec);
+    if (int(out.size()) > preSkip * 2) out.erase(out.begin(), out.begin() + preSkip * 2);
+    return out;
+}
+static std::vector<float> decodeMp3(const QByteArray& mp3, int* rate) {
+    std::vector<float> out;
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 0);
+    cfg.encodingFormat = ma_encoding_format_mp3;
+    ma_decoder dec;
+    if (ma_decoder_init_memory(mp3.constData(), size_t(mp3.size()), &cfg, &dec) != MA_SUCCESS) return out;
+    *rate = int(dec.outputSampleRate);
+    std::vector<float> buf(4096 * 2);
+    for (;;) {
+        ma_uint64 got = 0;
+        ma_decoder_read_pcm_frames(&dec, buf.data(), 4096, &got);
+        if (!got) break;
+        out.insert(out.end(), buf.begin(), buf.begin() + long(got * 2));
+    }
+    ma_decoder_uninit(&dec);
+    return out;
+}
+static std::vector<float> sineStereo(double hz, double secs, int sr) {
+    std::vector<float> v(size_t(secs * sr) * 2);
+    for (size_t i = 0; i < v.size() / 2; ++i) v[2 * i] = v[2 * i + 1] = float(0.4 * std::sin(2 * M_PI * hz * double(i) / sr));
+    return v;
+}
+// Servidor de prueba: guarda lo recibido por cada conexión y responde con las reglas dadas.
+struct FakeServer {
+    QTcpServer server;
+    QList<QByteArray> received;            // por conexión, en orden
+    std::function<QByteArray(int idx, const QByteArray& head)> reply;   // respuesta al encabezado
+    QList<QTcpSocket*> sockets;
+    bool listen(quint16 port = 0) {
+        if (!server.listen(QHostAddress::LocalHost, port)) return false;
+        QObject::connect(&server, &QTcpServer::newConnection, [this]() {
+            while (QTcpSocket* c = server.nextPendingConnection()) {
+                const int idx = int(received.size());
+                received << QByteArray();
+                sockets << c;
+                auto replied = std::make_shared<bool>(false);
+                QObject::connect(c, &QTcpSocket::readyRead, [this, c, idx, replied]() {
+                    received[idx] += c->readAll();
+                    const QByteArray& b = received[idx];
+                    const bool headDone = b.contains("\r\n\r\n") || (b.endsWith("\r\n") && !b.contains(' ') && !b.contains(':'));
+                    if (!*replied && headDone && reply) {
+                        *replied = true;
+                        const QByteArray r = reply(idx, b);
+                        if (r == "CLOSE") c->disconnectFromHost();
+                        else c->write(r);
+                    }
+                });
+            }
+        });
+        return true;
+    }
+    quint16 port() const { return server.serverPort(); }
+};
+static void pump(int ms) {
+    QElapsedTimer t; t.start();
+    while (t.elapsed() < ms) QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
 }
 
 static double rms(const std::vector<float>& v) {
@@ -1208,6 +1325,178 @@ int main(int argc, char** argv) {
             waitLoaded(a);
             CHECK(!a.hasVideo(), "al cargar una pista de audio se quita el video");
         }
+    }
+
+
+    std::printf("\n[21] Transmisión en vivo\n");
+    {
+        // --- Opus en Ogg: codificar y decodificar de vuelta
+        {
+            jx::OpusStreamEncoder enc(96);
+            QByteArray ogg = enc.start("Artista - Tema");
+            const auto sine = sineStereo(440, 2.0, 48000);
+            for (size_t i = 0; i < sine.size(); i += 2 * 1000)
+                ogg += enc.encode(sine.data() + i, int(std::min<size_t>(1000, (sine.size() - i) / 2)));
+            ogg += enc.finish();
+            const OggPacketList pl = parseOgg(ogg);
+            CHECK(pl.crcOk && pl.bosFirst && pl.packets.size() > 50 && pl.packets[0].startsWith("OpusHead") &&
+                  pl.packets[1].startsWith("OpusTags") && pl.packets[1].contains("TITLE=Artista - Tema"),
+                  "Ogg/Opus válido: CRC, cabeceras y título (%d páginas, %d paquetes)", pl.pages, int(pl.packets.size()));
+            const auto dec = decodeOpusPackets(pl.packets, enc.preSkip());
+            const double hz = zeroCrossHz(std::vector<float>(dec.begin() + 9600, dec.end() - 9600), 48000);
+            CHECK(std::abs(dec.size() / 2.0 / 48000 - 2.0) < 0.05 && std::abs(hz - 440) < 3,
+                  "Opus se decodifica de vuelta: %.2f s a %.1f Hz", dec.size() / 2.0 / 48000, hz);
+        }
+        // --- MP3 (Shine)
+        {
+            QString e;
+            auto enc = jx::StreamEncoder::create(jx::StreamEncoder::Mp3, 128, 44100, &e);
+            CHECK(enc && enc->inputRate() == 44100 && enc->mimeType() == "audio/mpeg", "codificador MP3 a 44,1 kHz");
+            QByteArray mp3 = enc->start({});
+            const auto sine = sineStereo(440, 3.0, 44100);
+            mp3 += enc->encode(sine.data(), int(sine.size() / 2));
+            mp3 += enc->finish();
+            int rate = 0;
+            const auto dec = decodeMp3(mp3, &rate);
+            const double hz = dec.size() > 20000 ? zeroCrossHz(std::vector<float>(dec.begin() + 8820, dec.end() - 8820), rate) : 0;
+            const double kbps = mp3.size() * 8.0 / 3.0 / 1000.0;
+            CHECK(rate == 44100 && std::abs(dec.size() / 2.0 / 44100 - 3.0) < 0.1 && std::abs(hz - 440) < 3 && std::abs(kbps - 128) < 8,
+                  "MP3 se decodifica de vuelta: %.2f s a %.1f Hz, %.0f kbps", dec.size() / 2.0 / std::max(1, rate), hz, kbps);
+        }
+
+        // --- Icecast simulado
+        auto feed = [](jx::Broadcaster& bc, int sr, double secs) {   // audio al ritmo del reloj
+            const auto sine = sineStereo(440, secs, sr);
+            QElapsedTimer t; t.start();
+            size_t done = 0;
+            while (done < sine.size() / 2) {
+                const size_t due = std::min(sine.size() / 2, size_t(t.elapsed() / 1000.0 * sr));
+                if (due > done) { bc.push(sine.data() + done * 2, int(due - done)); done = due; }
+                QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
+            }
+        };
+        jx::Broadcaster::Config cfg;
+        cfg.host = "127.0.0.1";
+        cfg.mount = "prueba";
+        cfg.user = "source";
+        cfg.password = "secreto";
+        cfg.name = "Radio Prueba";
+        cfg.genre = "House";
+        cfg.format = jx::StreamEncoder::Opus;
+        cfg.bitrate = 96;
+        cfg.retrySeconds = 1;
+        {
+            FakeServer ice;
+            CHECK(ice.listen(), "servidor Icecast de prueba escuchando");
+            ice.reply = [](int, const QByteArray&) { return QByteArray("HTTP/1.1 200 OK\r\n\r\n"); };
+            cfg.port = ice.port();
+            jx::Broadcaster bc;
+            QString err;
+            CHECK(bc.start(cfg, 44100, &err), "transmisión iniciada %s", qPrintable(err));
+            bc.setTitle("Jocker - Noche Larga");
+            pump(400);
+            feed(bc, 44100, 2.0);
+            pump(300);
+            const QByteArray got = ice.received.value(0);
+            const int bodyAt = got.indexOf("\r\n\r\n") + 4;
+            const QByteArray head = got.left(bodyAt), body = got.mid(bodyAt);
+            CHECK(head.startsWith("PUT /prueba HTTP/1.1\r\n") && head.contains("Authorization: Basic " + QByteArray("source:secreto").toBase64()) &&
+                  head.contains("Content-Type: audio/ogg") && head.contains("Ice-Name: Radio Prueba") && head.contains("Ice-Genre: House"),
+                  "petición Icecast (PUT, autenticación, tipo y datos de la emisión)");
+            CHECK(bc.state() == jx::Broadcaster::Live && bc.bytesSent() > 15000, "en vivo: %.1f kB enviados", bc.bytesSent() / 1024.0);
+            const OggPacketList pl = parseOgg(body);
+            const auto dec = decodeOpusPackets(pl.packets, 312);
+            const double hz = dec.size() > 48000 ? zeroCrossHz(std::vector<float>(dec.begin() + 9600, dec.end()), 48000) : 0;
+            CHECK(pl.crcOk && pl.bosFirst && body.contains("TITLE=Jocker - Noche Larga") && std::abs(hz - 440) < 4,
+                  "el servidor recibe Ogg/Opus válido con el título; se oye a %.1f Hz (convertido de 44,1 a 48 kHz)", hz);
+            // Se cae el servidor → se reconecta solo
+            for (QTcpSocket* c : ice.sockets) c->abort();
+            QElapsedTimer w; w.start();
+            bool sawError = false;
+            while (w.elapsed() < 8000 && (ice.received.size() < 2 || bc.state() != jx::Broadcaster::Live)) {
+                std::vector<float> z(441 * 2, 0.f);
+                bc.push(z.data(), 441);
+                if (bc.state() == jx::Broadcaster::Error) sawError = true;
+                pump(10);
+            }
+            CHECK(sawError && ice.received.size() >= 2 && bc.state() == jx::Broadcaster::Live && bc.reconnects() >= 1,
+                  "si se cae la conexión se reconecta sola (%d reconexión)", bc.reconnects());
+            CHECK(ice.received.value(1).contains("OggS") || ice.received.value(1).startsWith("PUT"), "la nueva conexión empieza un flujo nuevo");
+            bc.stop();
+            CHECK(bc.state() == jx::Broadcaster::Off, "detener");
+        }
+        {   // contraseña incorrecta
+            FakeServer ice;
+            ice.listen();
+            ice.reply = [](int, const QByteArray&) { return QByteArray("HTTP/1.1 401 Unauthorized\r\n\r\n"); };
+            cfg.port = ice.port();
+            jx::Broadcaster bc;
+            QString err;
+            bc.start(cfg, 48000, &err);
+            QElapsedTimer w; w.start();
+            while (w.elapsed() < 4000 && bc.state() != jx::Broadcaster::Error) pump(20);
+            CHECK(bc.state() == jx::Broadcaster::Error && bc.lastError() == "Usuario o contraseña incorrectos",
+                  "contraseña incorrecta: «%s»", qPrintable(bc.lastError()));
+            bc.stop();
+        }
+        {   // Icecast antiguo: rechaza PUT y acepta SOURCE
+            FakeServer ice;
+            ice.listen();
+            ice.reply = [](int idx, const QByteArray&) {
+                return idx == 0 ? QByteArray("HTTP/1.0 405 Method Not Allowed\r\n\r\n") : QByteArray("HTTP/1.0 200 OK\r\n\r\n");
+            };
+            cfg.port = ice.port();
+            jx::Broadcaster bc;
+            QString err;
+            bc.start(cfg, 48000, &err);
+            QElapsedTimer w; w.start();
+            while (w.elapsed() < 4000 && bc.state() != jx::Broadcaster::Live) pump(20);
+            CHECK(bc.state() == jx::Broadcaster::Live && ice.received.value(1).startsWith("SOURCE /prueba ICE/1.0\r\n"),
+                  "servidor antiguo: vuelve a intentar con SOURCE");
+            bc.stop();
+        }
+        {   // SHOUTcast: fuente en puerto+1 y títulos por admin.cgi en el puerto de oyentes
+            FakeServer listeners, source;
+            bool okPorts = false;
+            for (int tries = 0; tries < 20 && !okPorts; ++tries) {
+                const quint16 p = quint16(20000 + QRandomGenerator::global()->bounded(20000));
+                if (listeners.listen(p)) { if (source.listen(quint16(p + 1))) okPorts = true; else listeners.server.close(); }
+            }
+            CHECK(okPorts, "servidores SHOUTcast de prueba");
+            source.reply = [](int, const QByteArray& b) {
+                return b.startsWith("secreto\r\n") ? QByteArray("OK2\r\nicy-caps:11\r\n\r\n") : QByteArray("invalid password\r\n");
+            };
+            listeners.reply = [](int, const QByteArray&) { return QByteArray("HTTP/1.0 200 OK\r\n\r\n"); };
+            jx::Broadcaster::Config sc = cfg;
+            sc.server = jx::Broadcaster::Shoutcast;
+            sc.port = listeners.port();
+            sc.mount = "/";
+            sc.format = jx::StreamEncoder::Mp3;
+            sc.bitrate = 128;
+            jx::Broadcaster bc;
+            QString err;
+            jx::Broadcaster::Config bad = sc;
+            bad.format = jx::StreamEncoder::Opus;
+            CHECK(!bc.start(bad, 48000, &err) && err.contains("MP3"), "SHOUTcast con Opus: «%s»", qPrintable(err));
+            CHECK(bc.start(sc, 48000, &err), "SHOUTcast iniciado");
+            pump(300);
+            feed(bc, 48000, 1.5);
+            bc.setTitle("Jocker - Sube");
+            feed(bc, 48000, 0.6);
+            pump(600);
+            const QByteArray got = source.received.value(0);
+            const int sync = got.indexOf("\xFF\xFB");
+            CHECK(bc.state() == jx::Broadcaster::Live && got.startsWith("secreto\r\n") && got.contains("icy-name: Radio Prueba") &&
+                  got.contains("content-type: audio/mpeg") && sync > 0, "SHOUTcast: contraseña, cabeceras icy y cuadros MP3");
+            QByteArray meta;
+            for (const QByteArray& r : listeners.received) if (r.contains("admin.cgi")) meta = r;
+            CHECK(meta.startsWith("GET /admin.cgi?pass=secreto&mode=updinfo&song=Jocker%20-%20Sube "), "título enviado a SHOUTcast");
+            bc.stop();
+        }
+        // --- Cabeceras sin inyección de líneas
+        jx::Broadcaster::Config inj = cfg;
+        inj.name = "Mi radio\r\nX-Malo: 1";
+        CHECK(!jx::Broadcaster::icecastRequest(inj, "audio/ogg", 48000, false).contains("\r\nX-Malo"), "los datos de la emisión no pueden inyectar cabeceras");
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

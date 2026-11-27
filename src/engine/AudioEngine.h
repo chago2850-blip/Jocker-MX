@@ -31,6 +31,14 @@ struct ChannelParams {
 };
 
 // Motor de audio: dispositivo, decks y mezclador maestro.
+// Receptor del master final (transmisión en vivo, etc.). push() se llama desde el hilo de audio:
+// debe ser sin bloqueos.
+class AudioTap {
+public:
+    virtual ~AudioTap() = default;
+    virtual void push(const float* stereo, int frames) = 0;
+};
+
 class AudioEngine {
 public:
     explicit AudioEngine(int numDecks = 2);
@@ -46,6 +54,7 @@ public:
     EffectUnit& effects(int i) { return *m_fx[i]; }
     Sampler& sampler() { return m_sampler; }
     Recorder& recorder() { return m_recorder; }
+    void setTap(AudioTap* t) { m_tap.store(t, std::memory_order_release); }   // nullptr = quitar
 
     double sampleRate() const { return m_sr; }
     int outputChannels() const { return m_outCh; }
@@ -81,6 +90,7 @@ private:
     std::vector<float> m_master, m_cue;
     Sampler m_sampler;
     Recorder m_recorder;
+    std::atomic<AudioTap*> m_tap{nullptr};
 
     ma_context* m_ctx = nullptr;
     ma_device* m_dev = nullptr;

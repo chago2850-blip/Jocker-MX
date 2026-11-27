@@ -148,7 +148,7 @@ ApplicationWindow {
             Layout.leftMargin: 14
             spacing: 6
             Repeater {
-                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix", "🎤  Karaoke", "🎬  Video"]
+                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix", "🎤  Karaoke", "🎬  Video", "📡  En vivo"]
                 Rectangle {
                     width: 128; height: 26; radius: 6
                     color: bottomTabs.currentIndex === index ? Theme.panel : "transparent"
@@ -165,12 +165,13 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.margins: 10
             Layout.topMargin: 4
-            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : (startupPanel === "karaoke" ? 3 : (startupPanel === "video" ? 4 : 0)))
+            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : (startupPanel === "karaoke" ? 3 : (startupPanel === "video" ? 4 : (startupPanel === "envivo" ? 5 : 0))))
             LibraryPanel {}
             SamplerPanel {}
             AutomixPanel {}
             KaraokePanel {}
             VideoPanel {}
+            BroadcastPanel {}
         }
     }
     }

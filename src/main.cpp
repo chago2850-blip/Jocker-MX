@@ -8,6 +8,7 @@
 #include "app/EventScheduler.h"
 #include "app/KaraokeController.h"
 #include "app/BroadcastController.h"
+#include "app/UiPrefs.h"
 #include "app/SamplerController.h"
 #include "control/MidiManager.h"
 #include "engine/AudioEngine.h"
@@ -21,13 +22,16 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QKeyEvent>
 #include <QTimer>
 #ifdef Q_OS_ANDROID
 #include <QtCore/private/qandroidextras_p.h>
+#include <QJniObject>
+#include <QCoreApplication>
 #endif
 
 #ifndef JOCKER_VERSION
-#define JOCKER_VERSION "0.12.0-dev"
+#define JOCKER_VERSION "0.13.0-dev"
 #endif
 
 int main(int argc, char* argv[]) {
@@ -53,7 +57,9 @@ int main(int argc, char* argv[]) {
     QCommandLineOption optQueue("queue", "Agregar un archivo a la cola de Automix (se puede repetir)", "archivo");
     QCommandLineOption optAutomix("automix", "Encender el Automix al iniciar");
     QCommandLineOption optBroadcast("broadcast", "Salir en vivo al iniciar (con la configuración guardada)");
-    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix, optBroadcast});
+    QCommandLineOption optUi("ui", "Interfaz: tactil o escritorio (sin guardar la preferencia)", "modo");
+    QCommandLineOption optSize("size", "Tamaño de la ventana, p. ej. 800x400 (pruebas)", "AxB");
+    cli.addOptions({optA, optB, optPlay, optShot, optWait, optLib, optPanel, optQueue, optAutomix, optBroadcast, optUi, optSize});
     cli.process(app);
 
     const int fontId = QFontDatabase::addApplicationFont(QStringLiteral(":/JockerMX/resources/fonts/Montserrat.ttf"));
@@ -102,6 +108,8 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
+    jx::UiPrefs ui;   // antes del motor QML: debe sobrevivirle al cerrar
+    if (cli.isSet(optUi)) ui.forceTouch(cli.value(optUi).startsWith(QLatin1String("t")));
     QQmlApplicationEngine qml;
     qml.rootContext()->setContextProperty(QStringLiteral("deckA"), &deckA);
     qml.rootContext()->setContextProperty(QStringLiteral("deckB"), &deckB);
@@ -114,6 +122,7 @@ int main(int argc, char* argv[]) {
     qml.rootContext()->setContextProperty(QStringLiteral("scheduler"), &scheduler);
     qml.rootContext()->setContextProperty(QStringLiteral("karaoke"), &karaoke);
     qml.rootContext()->setContextProperty(QStringLiteral("broadcast"), &broadcast);
+    qml.rootContext()->setContextProperty(QStringLiteral("uiPrefs"), &ui);
     qml.rootContext()->setContextProperty(QStringLiteral("startupPanel"), cli.value(optPanel));
     qml.rootContext()->setContextProperty(QStringLiteral("appVersion"), QStringLiteral(JOCKER_VERSION));
     QObject::connect(&qml, &QQmlApplicationEngine::objectCreationFailed, &app,
@@ -123,6 +132,19 @@ int main(int argc, char* argv[]) {
     qml.addImportPath(QStringLiteral("qrc:/"));
     qml.load(QUrl(QStringLiteral("qrc:/JockerMX/qml/Main.qml")));
     if (qml.rootObjects().isEmpty()) return 1;
+    if (cli.isSet(optSize)) {
+        const QStringList wh = cli.value(optSize).split(QLatin1Char('x'));
+        if (auto* win = qobject_cast<QQuickWindow*>(qml.rootObjects().first()); win && wh.size() == 2)
+            win->resize(wh[0].toInt(), wh[1].toInt());
+    }
+#ifdef Q_OS_ANDROID
+    // Pantalla siempre encendida mientras Jocker-MX está abierto (FLAG_KEEP_SCREEN_ON)
+    QNativeInterface::QAndroidApplication::runOnAndroidMainThread([]() {
+        QJniObject activity = QNativeInterface::QAndroidApplication::context();
+        QJniObject window = activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+        if (window.isValid()) window.callMethod<void>("addFlags", "(I)V", 128);
+    });
+#endif
 
     if (cli.isSet(optA)) deckA.load(cli.value(optA));
     if (cli.isSet(optB)) deckB.load(cli.value(optB));
@@ -136,6 +158,22 @@ int main(int argc, char* argv[]) {
         };
         startWhenReady(&deckA);
         startWhenReady(&deckB);
+    }
+    // Pruebas de la navegación con control remoto: JX_SIMULATE_KEYS="Up,Right,Return,Back"
+    if (const QByteArray keys = qgetenv("JX_SIMULATE_KEYS"); !keys.isEmpty()) {
+        auto* win = qobject_cast<QQuickWindow*>(qml.rootObjects().first());
+        int delay = 1500;
+        for (const QByteArray& k : keys.split(',')) {
+            const int key = k == "Up" ? Qt::Key_Up : k == "Down" ? Qt::Key_Down : k == "Left" ? Qt::Key_Left
+                          : k == "Right" ? Qt::Key_Right : k == "Back" ? Qt::Key_Back : Qt::Key_Return;
+            QTimer::singleShot(delay, &app, [win, key]() {
+                QKeyEvent press(QEvent::KeyPress, key, Qt::NoModifier);
+                QKeyEvent release(QEvent::KeyRelease, key, Qt::NoModifier);
+                QCoreApplication::sendEvent(win, &press);
+                QCoreApplication::sendEvent(win, &release);
+            });
+            delay += 250;
+        }
     }
     if (cli.isSet(optShot)) {
         const QString file = cli.value(optShot);

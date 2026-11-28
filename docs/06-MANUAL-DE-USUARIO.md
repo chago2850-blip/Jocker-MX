@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.12.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.13.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -165,6 +165,16 @@ Necesitas un servidor **Icecast 2** o **SHOUTcast** (propio o contratado con un 
 - **Enviar el título**: manda «Artista - Título» de la pista que más se oye. En MP3 se actualiza en cuanto cambia; en Opus el título va al inicio de cada conexión.
 - Errores típicos: «Usuario o contraseña incorrectos», «El punto de montaje está en uso» (ya hay otra fuente conectada), «No se pudo conectar» (dirección o puerto equivocados, o un cortafuegos).
 - La configuración (incluida la contraseña) se guarda en este equipo. Desde la línea de comandos, `--broadcast` sale en vivo al abrir la app.
+
+## 5 septies. Interfaz táctil (teléfono, tableta y TV Box)
+En Android se abre directamente la **interfaz táctil**. En la computadora puedes probarla con el botón **📱 TÁCTIL** de la barra superior; para volver, **⋯ Más → 🖥 Escritorio**. La elección se recuerda.
+- **Pestañas de abajo**: **🎛 Decks**, **🎵 Música**, **🔁 Automix**, **🥁 Pads** (sampler), **🎤 Karaoke** y **⋯ Más** (video, en vivo, grabar, pantalla del público, MIDI y cambio a escritorio). La barra superior muestra AUTO, REC y EN VIVO cuando están activos (tócalos para ir a su panel).
+- **Decks**: arrastra la forma de onda con el dedo para hacer **scratch**; toca la franja fina de abajo para saltar a esa parte. **CUE** (mantén pulsado para escuchar desde el cue), **▶/❚❚**, **SYNC** (mantén pulsado para el sync fijo), hot cues **1–4** (toca para fijar o saltar; mantén pulsado para borrar) y **LOOP 4** (mantén pulsado: loop de 8 o la mitad). Abajo, el **tempo** con **−/+** para empujar el ritmo y el botón de porcentaje: toca para **key lock**, mantén pulsado para volver a 0. En teléfonos en horizontal la fila de tempo se oculta para dar espacio.
+- **Mezclador**: agudos, medios, graves y filtro de cada deck (arrastra hacia arriba o abajo; doble toque para centrar), volumen de cada deck y crossfader (doble toque en cualquier fader para volver a su valor normal).
+- **Música**: busca por título, artista o BPM; elige vista (Todo, Historial, Más tocadas, Recientes o tus listas). Toca una canción para cargarla en el deck libre, o usa **A**, **B** o **+** (cola del Automix). **📁** elige la carpeta y **⚡** analiza BPM y tonalidad.
+- **Vertical**: deck A arriba, mezclador en medio y deck B abajo. **Horizontal**: deck A, mezclador y deck B lado a lado.
+
+**Con el control remoto (Android TV / TV Box)**: las **flechas** mueven el recuadro blanco de un botón a otro; **OK** pulsa. Sobre un fader, las flechas en su dirección lo mueven y OK lo devuelve a su valor normal. **Atrás** vuelve a los decks; en los decks, pulsa **Atrás dos veces** para salir. Jocker-MX aparece en el lanzador de Android TV y mantiene la pantalla encendida mientras está abierto.
 
 ## 6. Grabar tu mezcla
 Pulsa **REC** en la barra superior (o `Ctrl+R`). El punto rojo parpadea y verás el tiempo y cuántas pistas van. Al detenerla, en la carpeta **Música/Jocker-MX Grabaciones** quedan tres archivos con la fecha y hora:

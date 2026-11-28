@@ -92,6 +92,14 @@ Rectangle {
             }
             MouseArea { id: recMa; anchors.fill: parent; hoverEnabled: true; onClicked: recorder.toggle() }
         }
+        Rectangle {     // Cambiar a la interfaz táctil
+            Layout.preferredHeight: 28; Layout.preferredWidth: tTxt.implicitWidth + 20
+            radius: 6
+            color: tMa.containsMouse ? Theme.panel2 : "transparent"
+            border.color: Theme.border
+            Text { id: tTxt; anchors.centerIn: parent; text: "📱 TÁCTIL"; color: Theme.dim; font.pixelSize: 11; font.weight: Font.Bold }
+            MouseArea { id: tMa; anchors.fill: parent; hoverEnabled: true; onClicked: uiPrefs.touch = true }
+        }
         Rectangle {     // MIDI: dispositivos y actividad
             id: midiBtn
             Layout.preferredHeight: 28; Layout.preferredWidth: midiTxt.implicitWidth + 30

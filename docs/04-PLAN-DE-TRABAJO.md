@@ -106,6 +106,7 @@ Las fases se solapan; la columna "Meses" indica la ventana principal.
 ### F11 · Android (meses 10-22, en paralelo)
 - Mes 10-12: alfa (2 decks, biblioteca local, mezclador, sync).
 - Mes 13-18: UI táctil completa, USB MIDI/audio, stems cuantizados, FX, sampler.
+  - ✅ **0.13.0-dev**: interfaz táctil adaptable (horizontal/vertical), navegación con control remoto de TV, lanzador de Android TV, pantalla siempre encendida. Pendiente: USB audio dedicado y ajustes finos en dispositivos reales.
 - Mes 19-22: beta; variante TV/TV Box; publicación en F-Droid y Google Play.
 
 ### F12 · Servicios en línea opcionales (meses 18-22)

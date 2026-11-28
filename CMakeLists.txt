@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.12.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.12.0-dev")
+project(JockerMX VERSION 0.13.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.13.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -153,6 +153,7 @@ qt_add_qml_module(jocker-mx
     src/broadcast/Encoders.h src/broadcast/Encoders.cpp
     src/broadcast/Broadcaster.h src/broadcast/Broadcaster.cpp
     src/app/BroadcastController.h src/app/BroadcastController.cpp
+    src/app/UiPrefs.h
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
@@ -166,6 +167,15 @@ qt_add_qml_module(jocker-mx
     qml/Stage.qml
     qml/VideoPanel.qml
     qml/BroadcastPanel.qml
+    qml/DesktopUi.qml
+    qml/TouchUi.qml
+    qml/TouchDeck.qml
+    qml/TouchMixer.qml
+    qml/TouchLibrary.qml
+    qml/TouchMore.qml
+    qml/TouchButton.qml
+    qml/TouchFader.qml
+    qml/nav.js
     qml/JxField.qml
     qml/Knob.qml
     qml/JxButton.qml

@@ -10,19 +10,23 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-feature android:name="android.software.midi" android:required="false"/>
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <!-- También para Android TV / TV Box: sin pantalla táctil obligatoria y con el lanzador de TV -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
+    <uses-feature android:name="android.software.leanback" android:required="false"/>
     <supports-screens android:anyDensity="true" android:largeScreens="true" android:normalScreens="true"
         android:smallScreens="true" android:xlargeScreens="true"/>
     <application android:name="org.qtproject.qt.android.bindings.QtApplication"
         android:hardwareAccelerated="true" android:label="-- %%INSERT_APP_NAME%% --"
-        android:icon="@mipmap/ic_launcher" android:requestLegacyExternalStorage="true"
+        android:icon="@mipmap/ic_launcher" android:banner="@drawable/banner" android:requestLegacyExternalStorage="true"
         android:allowBackup="true" android:fullBackupOnly="false">
         <activity android:name="org.qtproject.qt.android.bindings.QtActivity"
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
-            android:launchMode="singleTop" android:screenOrientation="sensorLandscape"
+            android:launchMode="singleTop" android:screenOrientation="fullUser"
             android:exported="true" android:label="Jocker-MX">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
             <meta-data android:name="android.app.lib_name" android:value="-- %%INSERT_APP_LIB_NAME%% --"/>
             <meta-data android:name="android.app.arguments" android:value="-- %%INSERT_APP_ARGUMENTS%% --"/>

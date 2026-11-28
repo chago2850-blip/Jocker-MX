@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.13.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.14.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -169,9 +169,14 @@ Necesitas un servidor **Icecast 2** o **SHOUTcast** (propio o contratado con un 
 ## 5 septies. Interfaz táctil (teléfono, tableta y TV Box)
 En Android se abre directamente la **interfaz táctil**. En la computadora puedes probarla con el botón **📱 TÁCTIL** de la barra superior; para volver, **⋯ Más → 🖥 Escritorio**. La elección se recuerda.
 - **Pestañas de abajo**: **🎛 Decks**, **🎵 Música**, **🔁 Automix**, **🥁 Pads** (sampler), **🎤 Karaoke** y **⋯ Más** (video, en vivo, grabar, pantalla del público, MIDI y cambio a escritorio). La barra superior muestra AUTO, REC y EN VIVO cuando están activos (tócalos para ir a su panel).
-- **Decks**: arrastra la forma de onda con el dedo para hacer **scratch**; toca la franja fina de abajo para saltar a esa parte. **CUE** (mantén pulsado para escuchar desde el cue), **▶/❚❚**, **SYNC** (mantén pulsado para el sync fijo), hot cues **1–4** (toca para fijar o saltar; mantén pulsado para borrar) y **LOOP 4** (mantén pulsado: loop de 8 o la mitad). Abajo, el **tempo** con **−/+** para empujar el ritmo y el botón de porcentaje: toca para **key lock**, mantén pulsado para volver a 0. En teléfonos en horizontal la fila de tempo se oculta para dar espacio.
+- **Decks**: arrastra la forma de onda con el dedo para hacer **scratch**; toca la franja fina de abajo para saltar a esa parte. **CUE** (mantén pulsado para escuchar desde el cue), **▶/❚❚**, **SYNC** (mantén pulsado para el sync fijo), hot cues **1–4** (toca para fijar o saltar; mantén pulsado para borrar) y **LOOP 4** (mantén pulsado: loop de 8 o la mitad). Encima de los pads elige su modo:
+  - **CUES**: hot cues 1–4 y LOOP 4.
+  - **LOOP**: ◀◀/▶▶ saltan 4 beats; **½**, **1**, **4**, **8** y **×2** fijan o cambian el loop (toca el activo para salir).
+  - **FX**: ECO, REV (reverb), FLA (flanger), PHA (phaser), CRU (crusher) y GAT (gate); toca para encender/apagar. En pantallas anchas aparece el fader de mezcla del efecto.
+  - **STEMS**: VOZ, BAT, BAJO y MEL encienden o apagan cada parte; **ACAP** deja sólo la voz e **INST** la quita. Mientras la IA separa la canción verás «⏳ %»; si no se separó, toca una parte para empezar. Abajo, el **tempo** con **−/+** para empujar el ritmo y el botón de porcentaje: toca para **key lock**, mantén pulsado para volver a 0. En teléfonos en horizontal la fila de tempo se oculta para dar espacio.
 - **Mezclador**: agudos, medios, graves y filtro de cada deck (arrastra hacia arriba o abajo; doble toque para centrar), volumen de cada deck y crossfader (doble toque en cualquier fader para volver a su valor normal).
-- **Música**: busca por título, artista o BPM; elige vista (Todo, Historial, Más tocadas, Recientes o tus listas). Toca una canción para cargarla en el deck libre, o usa **A**, **B** o **+** (cola del Automix). **📁** elige la carpeta y **⚡** analiza BPM y tonalidad.
+- **Automix**, **Pads** y **Karaoke** tienen su versión táctil: botón grande de encendido del Automix con estilo y duración de la mezcla y la cola con ▲▼✕; 8 pads grandes (mantén pulsado un pad para cambiar su modo: una vez, bucle o mantener) con volumen y PARAR; y en karaoke la vista previa, el **TONO** −/+, la pantalla del público 📺, «SIGUIENTE» y la rotación con el tono de cada cantante (mantén pulsado un nombre para cambiarlo).
+- **Música**: mantén pulsada una canción para ver sus acciones: cargar en A o B, Automix (al final o a continuación), **🎤 Karaoke…** (agrega un cantante con esa canción) y agregarla a una lista (o crear una nueva). Busca por título, artista o BPM; elige vista (Todo, Historial, Más tocadas, Recientes o tus listas). Toca una canción para cargarla en el deck libre, o usa **A**, **B** o **+** (cola del Automix). **📁** elige la carpeta y **⚡** analiza BPM y tonalidad.
 - **Vertical**: deck A arriba, mezclador en medio y deck B abajo. **Horizontal**: deck A, mezclador y deck B lado a lado.
 
 **Con el control remoto (Android TV / TV Box)**: las **flechas** mueven el recuadro blanco de un botón a otro; **OK** pulsa. Sobre un fader, las flechas en su dirección lo mueven y OK lo devuelve a su valor normal. **Atrás** vuelve a los decks; en los decks, pulsa **Atrás dos veces** para salir. Jocker-MX aparece en el lanzador de Android TV y mantiene la pantalla encendida mientras está abierto.

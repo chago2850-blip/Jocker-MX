@@ -22,6 +22,61 @@ Rectangle {
         else loadTo(deckA, path)
     }
 
+    // ---- Acciones de una canción (mantener pulsada)
+    property string sheetPath: ""
+    property string sheetTitle: ""
+    function openSheet(path, title) { sheetPath = path; sheetTitle = title; sheet.open() }
+    Popup {
+        id: sheet
+        modal: true
+        anchors.centerIn: Overlay.overlay
+        width: Math.min(root.width - 20, 460)
+        padding: 12
+        background: Rectangle { color: Theme.panel; radius: 14; border.color: Theme.gold }
+        onOpened: firstAction.forceActiveFocus()
+        ColumnLayout {
+            width: parent.width
+            spacing: 8
+            Text { Layout.fillWidth: true; elide: Text.ElideRight; text: root.sheetTitle; color: Theme.gold; font.pixelSize: 16; font.weight: Font.Bold }
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 2; rowSpacing: 6; columnSpacing: 6
+                TouchButton { id: firstAction; Layout.fillWidth: true; Layout.preferredHeight: 48; text: "Cargar en A"; accent: Theme.deckColor(0)
+                              onClicked: { sheet.close(); root.loadTo(deckA, root.sheetPath) } }
+                TouchButton { Layout.fillWidth: true; Layout.preferredHeight: 48; text: "Cargar en B"; accent: Theme.deckColor(1)
+                              onClicked: { sheet.close(); root.loadTo(deckB, root.sheetPath) } }
+                TouchButton { Layout.fillWidth: true; Layout.preferredHeight: 48; text: "➕ Automix"; sub: "al final"; fontSize: 14; accent: Theme.green
+                              onClicked: { sheet.close(); automix.add([root.sheetPath]) } }
+                TouchButton { Layout.fillWidth: true; Layout.preferredHeight: 48; text: "⤒ Automix"; sub: "a continuación"; fontSize: 14; accent: Theme.green
+                              onClicked: { sheet.close(); automix.addNext([root.sheetPath]) } }
+                TouchButton { Layout.fillWidth: true; Layout.columnSpan: 2; Layout.preferredHeight: 48; text: "🎤 Karaoke…"; sub: "agregar un cantante"; fontSize: 14
+                              accent: Theme.magenta; onClicked: { sheet.close(); singerPrompt.ask("¿Quién canta?", "", "Agregar") } }
+            }
+            Text { text: "AGREGAR A UNA LISTA"; color: Theme.faint; font.pixelSize: 10; font.weight: Font.Bold; font.letterSpacing: 1.2 }
+            Flow {
+                Layout.fillWidth: true
+                spacing: 6
+                Repeater {
+                    model: library.playlists
+                    TouchButton { width: Math.max(110, lt.implicitWidth + 24); height: 40; text: "📃 " + modelData.name; fontSize: 12; accent: Theme.cyan
+                                  onClicked: { sheet.close(); library.addToPlaylist(modelData.id, [root.sheetPath]) }
+                                  Text { id: lt; visible: false; text: "📃 " + modelData.name; font.pixelSize: 12; font.weight: Font.Bold } }
+                }
+                TouchButton { width: 130; height: 40; text: "+ Lista nueva"; fontSize: 12
+                              onClicked: { sheet.close(); listPrompt.ask("Nueva lista", "", "Crear") } }
+            }
+            TouchButton { Layout.fillWidth: true; Layout.preferredHeight: 42; text: "Cancelar"; fontSize: 13; onClicked: sheet.close() }
+        }
+    }
+    JxPrompt {
+        id: singerPrompt
+        onAccepted: function(name) { karaoke.addSinger(name, root.sheetPath, 0) }
+    }
+    JxPrompt {
+        id: listPrompt
+        onAccepted: function(name) { library.createPlaylist(name, [root.sheetPath]) }
+    }
+
     FolderDialog {
         id: folderDialog
         title: "Elige tu carpeta de música"
@@ -109,7 +164,8 @@ Rectangle {
                 radius: 10
                 color: rowMa.pressed ? Theme.raised : (index % 2 ? Theme.bg2 : Qt.rgba(1, 1, 1, 0.03))
                 border.color: onA ? Theme.deckColor(0) : (onB ? Theme.deckColor(1) : "transparent")
-                MouseArea { id: rowMa; anchors.fill: parent; onClicked: root.loadFree(row.path) }
+                MouseArea { id: rowMa; anchors.fill: parent; onClicked: root.loadFree(row.path)
+                            onPressAndHold: root.openSheet(row.path, row.title) }
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 12; anchors.rightMargin: 6

@@ -137,28 +137,109 @@ Rectangle {
             }
         }
 
-        // ---- Hot cues y loop
-        RowLayout {
+        // ---- Modo de los pads: CUES · LOOP · FX · STEMS
+        Row {
+            id: modeRow
             Layout.fillWidth: true
-            spacing: 5
+            spacing: 4
+            property int mode: 0
             Repeater {
-                model: 4
+                model: ["CUES", "LOOP", "FX", "STEMS"]
                 TouchButton {
-                    Layout.fillWidth: true; Layout.preferredHeight: root.tight ? 38 : 42
-                    readonly property bool isSet: root.deck.hotCues.length > index && root.deck.hotCues[index] >= 0
-                    text: (index + 1).toString(); fontSize: 14
-                    accent: ["#ff2d8c", "#3fe0ff", "#55e08a", "#f5b942"][index]
-                    active: isSet
-                    onClicked: root.deck.hotCue(index)
-                    onLongPressed: root.deck.clearHotCue(index)
+                    width: (modeRow.width - 12) / 4
+                    height: root.tight ? 26 : 30
+                    text: index === 3 && root.deck.stemsState === 1 ? "⏳ " + Math.round(root.deck.stemsProgress * 100) + "%"
+                          : modelData + (index === 2 && root.deck.fxType > 0 ? " ●" : "")
+                    fontSize: 11
+                    accent: Theme.gold
+                    active: modeRow.mode === index
+                    onClicked: modeRow.mode = index
                 }
             }
-            TouchButton {
-                Layout.preferredWidth: 70; Layout.preferredHeight: root.tight ? 38 : 42
-                text: root.deck.loopActive ? "LOOP " + root.deck.loopBeats : "LOOP 4"
-                fontSize: 12; accent: Theme.green; active: root.deck.loopActive
-                onClicked: root.deck.loopActive ? root.deck.loopExit() : root.deck.autoLoop(4)
-                onLongPressed: root.deck.loopActive ? root.deck.loopHalve() : root.deck.autoLoop(8)
+        }
+        StackLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: root.tight ? 38 : 42
+            currentIndex: modeRow.mode
+            // CUES
+            RowLayout {
+                spacing: 5
+                Repeater {
+                    model: 4
+                    TouchButton {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        readonly property bool isSet: root.deck.hotCues.length > index && root.deck.hotCues[index] >= 0
+                        text: (index + 1).toString(); fontSize: 14
+                        accent: ["#ff2d8c", "#3fe0ff", "#55e08a", "#f5b942"][index]
+                        active: isSet
+                        onClicked: root.deck.hotCue(index)
+                        onLongPressed: root.deck.clearHotCue(index)
+                    }
+                }
+                TouchButton {
+                    Layout.preferredWidth: 70; Layout.fillHeight: true
+                    text: root.deck.loopActive ? "LOOP " + root.deck.loopBeats : "LOOP 4"
+                    fontSize: 12; accent: Theme.green; active: root.deck.loopActive
+                    onClicked: root.deck.loopActive ? root.deck.loopExit() : root.deck.autoLoop(4)
+                    onLongPressed: root.deck.loopActive ? root.deck.loopHalve() : root.deck.autoLoop(8)
+                }
+            }
+            // LOOP
+            RowLayout {
+                spacing: 5
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "◀◀"; fontSize: 13; onClicked: root.deck.beatJump(-4) }
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "½"; onClicked: root.deck.loopActive ? root.deck.loopHalve() : root.deck.autoLoop(2) }
+                Repeater {
+                    model: [1, 4, 8]
+                    TouchButton {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        text: modelData.toString(); fontSize: 14; accent: Theme.green
+                        active: root.deck.loopActive && root.deck.loopBeats === modelData
+                        onClicked: (root.deck.loopActive && root.deck.loopBeats === modelData) ? root.deck.loopExit() : root.deck.autoLoop(modelData)
+                    }
+                }
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "×2"; onClicked: root.deck.loopActive ? root.deck.loopDouble() : root.deck.autoLoop(16) }
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "▶▶"; fontSize: 13; onClicked: root.deck.beatJump(4) }
+            }
+            // FX: tocar un efecto lo enciende/apaga; el fader controla la mezcla
+            RowLayout {
+                spacing: 4
+                Repeater {
+                    model: 6
+                    TouchButton {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        text: ["ECO", "REV", "FLA", "PHA", "CRU", "GAT"][index]; fontSize: 11
+                        accent: Theme.magenta
+                        active: root.deck.fxType === index + 1
+                        onClicked: root.deck.toggleFx(index + 1)
+                    }
+                }
+                TouchFader {
+                    visible: root.width > 420      // en decks estrechos el efecto usa la mezcla guardada
+                    Layout.preferredWidth: root.width * 0.26; Layout.fillHeight: true
+                    vertical: false; from: 0; to: 1; defaultValue: 0.5
+                    value: root.deck.fxWet; accent: Theme.magenta
+                    onMoved: function(v) { root.deck.fxWet = v }
+                }
+            }
+            // STEMS
+            RowLayout {
+                spacing: 4
+                Repeater {
+                    model: [["VOZ", "#ff2d8c"], ["BAT", "#f5b942"], ["BAJO", "#3fe0ff"], ["MEL", "#55e08a"]]
+                    TouchButton {
+                        Layout.fillWidth: true; Layout.fillHeight: true
+                        text: modelData[0]; fontSize: 11; accent: modelData[1]
+                        enabledLook: root.deck.stemsState === 2
+                        active: root.deck.stemsState === 2 && root.deck.stemOn.length > index && root.deck.stemOn[index]
+                        onClicked: if (root.deck.stemsState === 2) root.deck.toggleStem(index)
+                                   else if (root.deck.stemsState === 0 || root.deck.stemsState === 3) root.deck.prepareStems()
+                    }
+                }
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "ACAP"; fontSize: 11; accent: "#ff2d8c"
+                              enabledLook: root.deck.stemsState === 2; onClicked: root.deck.acapella() }
+                TouchButton { Layout.fillWidth: true; Layout.fillHeight: true; text: "INST"; fontSize: 11; accent: Theme.cyan
+                              enabledLook: root.deck.stemsState === 2; onClicked: root.deck.instrumental() }
             }
         }
 

@@ -115,9 +115,9 @@ Item {
                 }
             }
             TouchLibrary { onLoaded: t.page = 0 }
-            AutomixPanel {}
-            SamplerPanel {}
-            KaraokePanel {}
+            TouchAutomix {}
+            TouchPads {}
+            TouchKaraoke {}
             TouchMore { id: more; onOpenMidi: t.openMidi() }
         }
 

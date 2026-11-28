@@ -224,7 +224,8 @@ void AudioEngine::render(float* out, int n) {
         pkL = std::max(pkL, std::abs(l)); pkR = std::max(pkR, std::abs(r));
     }
     m_recorder.push(m_master.data(), n);     // grabación del master final (sin bloqueos)
-    if (AudioTap* tap = m_tap.load(std::memory_order_acquire)) tap->push(m_master.data(), n);
+    for (auto& slot : m_taps)
+        if (AudioTap* tap = slot.load(std::memory_order_acquire)) tap->push(m_master.data(), n);
     masterPeakL.store(pkL, std::memory_order_relaxed);
     masterPeakR.store(pkR, std::memory_order_relaxed);
     limiterGainReduction.store(1.f - minG, std::memory_order_relaxed);

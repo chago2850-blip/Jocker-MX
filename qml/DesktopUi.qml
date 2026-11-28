@@ -99,9 +99,9 @@ Item {
             Layout.leftMargin: 14
             spacing: 6
             Repeater {
-                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix", "🎤  Karaoke", "🎬  Video", "📡  En vivo"]
+                model: ["🎵  Biblioteca", "🥁  Sampler", "🔁  Automix", "🎤  Karaoke", "🎬  Video", "📡  En vivo", "📻  Radio"]
                 Rectangle {
-                    width: 128; height: 26; radius: 6
+                    width: 118; height: 26; radius: 6
                     color: bottomTabs.currentIndex === index ? Theme.panel : "transparent"
                     border.color: bottomTabs.currentIndex === index ? Theme.gold : Theme.border
                     Text { anchors.centerIn: parent; text: modelData; font.pixelSize: 12; font.weight: Font.DemiBold
@@ -116,13 +116,14 @@ Item {
             Layout.fillHeight: true
             Layout.margins: 10
             Layout.topMargin: 4
-            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : (startupPanel === "karaoke" ? 3 : (startupPanel === "video" ? 4 : (startupPanel === "envivo" ? 5 : 0))))
+            currentIndex: startupPanel === "sampler" ? 1 : (startupPanel === "automix" || startupPanel === "programacion" ? 2 : (startupPanel === "karaoke" ? 3 : (startupPanel === "video" ? 4 : (startupPanel === "envivo" ? 5 : (startupPanel === "radio" ? 6 : 0)))))
             LibraryPanel {}
             SamplerPanel {}
             AutomixPanel {}
             KaraokePanel {}
             VideoPanel {}
             BroadcastPanel {}
+            RadioPanel {}
         }
     }
     }

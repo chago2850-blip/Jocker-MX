@@ -6,7 +6,7 @@ import JockerMX
 // «Más»: video, transmisión en vivo, grabación, MIDI, pantalla del público y modo de interfaz.
 Item {
     id: root
-    property int sub: 0          // 0 menú, 1 video, 2 en vivo
+    property int sub: 0          // 0 menú, 1 video, 2 en vivo, 3 radio local
     signal openMidi()
 
     function back() { if (sub !== 0) { sub = 0; return true } return false }
@@ -31,6 +31,8 @@ Item {
                 Tile { text: "🎬  Video"; sub: deckA.hasVideo || deckB.hasVideo ? "hay video cargado" : "mezcla de video"; onClicked: root.sub = 1 }
                 Tile { text: "📡  En vivo"; sub: broadcast.onAir ? broadcast.stateText : "Icecast / SHOUTcast"
                        accent: Theme.red; active: broadcast.onAir; onClicked: root.sub = 2 }
+                Tile { text: "📻  Radio local"; sub: radio.running ? radio.listeners + " escuchando" : "por la Wi-Fi, con QR"
+                       accent: Theme.green; active: radio.running; onClicked: root.sub = 3 }
                 Tile { text: recorder.recording ? "⏹  Detener" : "⏺  Grabar"
                        sub: recorder.recording ? Theme.formatTime(recorder.seconds).slice(0, 5) : "la mezcla en WAV"
                        accent: Theme.red; active: recorder.recording; onClicked: recorder.toggle() }
@@ -43,5 +45,6 @@ Item {
         }
         VideoPanel {}
         BroadcastPanel {}
+        RadioPanel {}
     }
 }

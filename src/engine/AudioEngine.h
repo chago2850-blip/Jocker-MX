@@ -54,7 +54,8 @@ public:
     EffectUnit& effects(int i) { return *m_fx[i]; }
     Sampler& sampler() { return m_sampler; }
     Recorder& recorder() { return m_recorder; }
-    void setTap(AudioTap* t) { m_tap.store(t, std::memory_order_release); }   // nullptr = quitar
+    static constexpr int kTapSlots = 2;   // 0 = transmisión a servidor, 1 = radio local
+    void setTap(int slot, AudioTap* t) { m_taps[slot].store(t, std::memory_order_release); }   // nullptr = quitar
 
     double sampleRate() const { return m_sr; }
     int outputChannels() const { return m_outCh; }
@@ -90,7 +91,7 @@ private:
     std::vector<float> m_master, m_cue;
     Sampler m_sampler;
     Recorder m_recorder;
-    std::atomic<AudioTap*> m_tap{nullptr};
+    std::atomic<AudioTap*> m_taps[kTapSlots] = {};
 
     ma_context* m_ctx = nullptr;
     ma_device* m_dev = nullptr;

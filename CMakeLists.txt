@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.21)
 
-project(JockerMX VERSION 0.14.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
-set(JOCKER_VERSION_STRING "0.14.0-dev")
+project(JockerMX VERSION 0.15.0 DESCRIPTION "Software DJ libre" LANGUAGES C CXX)
+set(JOCKER_VERSION_STRING "0.15.0-dev")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -73,6 +73,10 @@ set_target_properties(jxopus PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(UNIX AND NOT APPLE)
   target_link_libraries(jxopus PRIVATE m)
 endif()
+# Códigos QR (MIT)
+add_library(jxqr STATIC third_party/qrcodegen/qrcodegen.cpp)
+target_include_directories(jxqr PUBLIC third_party/qrcodegen)
+set_target_properties(jxqr PROPERTIES POSITION_INDEPENDENT_CODE ON)
 file(GLOB JX_SHINE_SOURCES third_party/shine/*.c)
 add_library(jxshine STATIC ${JX_SHINE_SOURCES})
 target_include_directories(jxshine PUBLIC third_party/shine)
@@ -154,6 +158,9 @@ qt_add_qml_module(jocker-mx
     src/broadcast/Broadcaster.h src/broadcast/Broadcaster.cpp
     src/app/BroadcastController.h src/app/BroadcastController.cpp
     src/app/UiPrefs.h
+    src/broadcast/LocalRadio.h src/broadcast/LocalRadio.cpp
+    src/app/RadioController.h src/app/RadioController.cpp
+    src/ui/QrItem.h src/ui/QrItem.cpp
     src/control/MidiManager.h src/control/MidiManager.cpp
     src/app/SamplerController.h src/app/SamplerController.cpp
     src/app/RecordingController.h src/app/RecordingController.cpp
@@ -176,6 +183,7 @@ qt_add_qml_module(jocker-mx
     qml/TouchPads.qml
     qml/TouchAutomix.qml
     qml/TouchKaraoke.qml
+    qml/RadioPanel.qml
     qml/TouchButton.qml
     qml/TouchFader.qml
     qml/nav.js
@@ -232,7 +240,7 @@ if(MSVC)
   target_compile_definitions(jocker-mx PRIVATE _USE_MATH_DEFINES NOMINMAX)
 endif()
 target_link_libraries(jocker-mx PRIVATE
-  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql Qt6::Network rubberband miniaudio rtmidi jxplatformdec jxopus jxshine)
+  Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Concurrent Qt6::Sql Qt6::Network rubberband miniaudio rtmidi jxplatformdec jxopus jxshine jxqr)
 
 set_target_properties(jocker-mx PROPERTIES
   OUTPUT_NAME "jocker-mx"
@@ -356,6 +364,8 @@ if(JOCKER_BUILD_TESTS)
     src/video/DeckVideo.h src/video/DeckVideo.cpp
     src/broadcast/Encoders.h src/broadcast/Encoders.cpp
     src/broadcast/Broadcaster.h src/broadcast/Broadcaster.cpp
+    src/broadcast/LocalRadio.h src/broadcast/LocalRadio.cpp
+    src/ui/QrItem.h src/ui/QrItem.cpp
     src/library/TagReader.cpp src/library/LibraryDb.cpp
     src/stems/StemModel.cpp src/stems/StemSeparator.cpp src/stems/StemsService.h src/stems/StemsService.cpp
     src/app/DeckController.h src/app/DeckController.cpp
@@ -373,6 +383,6 @@ if(JOCKER_BUILD_TESTS)
   if(MSVC)
     target_compile_definitions(jx-tests PRIVATE _USE_MATH_DEFINES NOMINMAX)
   endif()
-  target_link_libraries(jx-tests PRIVATE jxopus jxshine Qt6::Network Qt6::Core Qt6::Gui Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
+  target_link_libraries(jx-tests PRIVATE jxopus jxshine jxqr Qt6::Quick Qt6::Network Qt6::Core Qt6::Gui Qt6::Qml Qt6::Concurrent Qt6::Sql rubberband miniaudio rtmidi jxplatformdec)
   add_test(NAME motor COMMAND jx-tests)
 endif()

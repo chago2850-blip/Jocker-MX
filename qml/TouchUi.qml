@@ -11,13 +11,14 @@ Item {
     id: t
     signal openMidi()
     property int page: startupPanel === "biblioteca" ? 1 : startupPanel === "automix" ? 2 : startupPanel === "sampler" ? 3
-                     : startupPanel === "karaoke" ? 4 : (startupPanel === "video" || startupPanel === "envivo" || startupPanel === "mas") ? 5 : 0
+                     : startupPanel === "karaoke" ? 4 : (startupPanel === "video" || startupPanel === "envivo" || startupPanel === "radio" || startupPanel === "mas") ? 5 : 0
     readonly property bool landscape: width >= height
     focus: true
 
     Component.onCompleted: {
         if (startupPanel === "video") more.sub = 1
         else if (startupPanel === "envivo") more.sub = 2
+        else if (startupPanel === "radio") more.sub = 3
         navRep.itemAt(t.page).forceActiveFocus()
     }
 
@@ -78,6 +79,7 @@ Item {
                 }
                 Pill { label: automix.mixing ? "AUTO · mezclando" : "AUTO"; on: automix.enabled; tint: Theme.green; onTapped: t.page = 2 }
                 Pill { label: "REC " + Theme.formatTime(recorder.seconds).slice(0, 5); on: recorder.recording; tint: Theme.red; onTapped: { t.page = 5; more.sub = 0 } }
+                Pill { label: "📻 " + radio.listeners; on: radio.running; tint: Theme.green; onTapped: { t.page = 5; more.sub = 3 } }
                 Pill { label: broadcast.state === 2 ? "EN VIVO" : "RECONECTANDO"; on: broadcast.onAir; tint: broadcast.state === 2 ? Theme.red : Theme.gold
                        onTapped: { t.page = 5; more.sub = 2 } }
                 VuMeter { Layout.preferredWidth: 46; Layout.preferredHeight: 8; level: Math.max(deckA.level, deckB.level); visible: t.width > 360 }

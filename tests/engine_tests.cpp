@@ -16,12 +16,16 @@
 #include "video/DeckVideo.h"
 #include "broadcast/Broadcaster.h"
 #include "broadcast/Encoders.h"
+#include "broadcast/LocalRadio.h"
+#include "ui/QrItem.h"
 #include "miniaudio.h"
 #include <opus.h>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QRandomGenerator>
 #include <functional>
+#include <thread>
+#include <chrono>
 #include <memory>
 #include "app/AutomixPlan.h"
 #include "analysis/Structure.h"
@@ -1497,6 +1501,106 @@ int main(int argc, char** argv) {
         jx::Broadcaster::Config inj = cfg;
         inj.name = "Mi radio\r\nX-Malo: 1";
         CHECK(!jx::Broadcaster::icecastRequest(inj, "audio/ogg", 48000, false).contains("\r\nX-Malo"), "los datos de la emisión no pueden inyectar cabeceras");
+    }
+
+
+    std::printf("\n[22] Radio local\n");
+    {
+        jx::LocalRadio radio;
+        jx::LocalRadio::Config rc;
+        rc.port = 0;
+        rc.name = "Fiesta <Prueba>";
+        QString err;
+        CHECK(radio.start(rc, 44100, &err) && radio.port() > 0, "servidor de radio en el puerto %d %s", radio.port(), qPrintable(err));
+        radio.setTitle("Jocker - Sube");
+        // Alimentar audio al ritmo del reloj en segundo plano (como el hilo de audio)
+        std::atomic<bool> feeding{true};
+        std::thread feeder([&]() {
+            const auto sine = sineStereo(440, 1.0, 44100);
+            size_t pos = 0;
+            auto t0 = std::chrono::steady_clock::now();
+            size_t sent = 0;
+            while (feeding.load()) {
+                const double el = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+                const size_t due = size_t(el * 44100);
+                while (sent < due) {
+                    const size_t n = std::min<size_t>(512, due - sent);
+                    std::vector<float> buf(n * 2);
+                    for (size_t i = 0; i < n; ++i) { buf[2 * i] = sine[(pos % 44100) * 2]; buf[2 * i + 1] = buf[2 * i]; ++pos; }
+                    radio.push(buf.data(), int(n));
+                    sent += n;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            }
+        });
+        auto httpGet = [&](const QByteArray& path, int ms, QTcpSocket* keep = nullptr) {
+            QTcpSocket local;
+            QTcpSocket& s = keep ? *keep : local;
+            s.connectToHost(QHostAddress::LocalHost, quint16(radio.port()));
+            s.waitForConnected(3000);
+            s.write("GET " + path + " HTTP/1.1\r\nHost: x\r\n\r\n");
+            s.waitForBytesWritten(1000);
+            QByteArray r;
+            QElapsedTimer t; t.start();
+            while (t.elapsed() < ms && (keep || s.state() == QAbstractSocket::ConnectedState || s.bytesAvailable())) {
+                if (s.waitForReadyRead(50)) r += s.readAll();
+                if (!keep && s.state() != QAbstractSocket::ConnectedState) { r += s.readAll(); break; }
+            }
+            return r;
+        };
+        pump(800);
+        const QByteArray page = httpGet("/", 2000);
+        CHECK(page.startsWith("HTTP/1.0 200 OK") && page.contains("text/html") && page.contains("<audio") == false &&
+              page.contains("/stream.mp3") && page.contains("Fiesta &lt;Prueba&gt;"), "página para el celular (nombre escapado)");
+        QTcpSocket l1;
+        const QByteArray mp3resp = httpGet("/stream.mp3", 2500, &l1);
+        const int body = mp3resp.indexOf("\r\n\r\n") + 4;
+        int rate = 0;
+        const auto dec = decodeMp3(mp3resp.mid(body), &rate);
+        const double hz = dec.size() > 9600 ? zeroCrossHz(std::vector<float>(dec.begin() + 4800, dec.end()), rate) : 0;
+        CHECK(mp3resp.startsWith("HTTP/1.0 200 OK") && mp3resp.contains("Content-Type: audio/mpeg") && rate == 48000 && std::abs(hz - 440) < 4,
+              "oyente MP3: %.1f s recibidos a %.1f Hz", dec.size() / 2.0 / std::max(1, rate), hz);
+        CHECK(radio.listeners() == 1, "1 oyente conectado");
+        const QByteArray js = httpGet("/status.json", 1500);
+        CHECK(js.contains("\"listeners\":1") && js.contains("\"title\":\"Jocker - Sube\""), "estado: oyentes y título");
+        // Un oyente nuevo arranca al instante con lo reciente
+        QTcpSocket l2;
+        const QByteArray quick = httpGet("/stream.mp3", 300, &l2);
+        CHECK(quick.size() - quick.indexOf("\r\n\r\n") > 20000, "un oyente nuevo recibe de golpe %.0f kB para arrancar ya",
+              (quick.size() - quick.indexOf("\r\n\r\n")) / 1024.0);
+        QTcpSocket l3;
+        const QByteArray oggresp = httpGet("/stream.ogg", 2000, &l3);
+        const OggPacketList pl = parseOgg(oggresp.mid(oggresp.indexOf("\r\n\r\n") + 4));
+        const auto od = decodeOpusPackets(pl.packets, 312);
+        const double ohz = od.size() > 9600 ? zeroCrossHz(std::vector<float>(od.begin() + 4800, od.end()), 48000) : 0;
+        CHECK(pl.crcOk && pl.packets.size() > 10 && pl.packets[0].startsWith("OpusHead") && std::abs(ohz - 440) < 4,
+              "oyente Opus: cabeceras primero y audio a %.1f Hz", ohz);
+        CHECK(radio.listeners() == 3, "3 oyentes a la vez (%d)", radio.listeners());
+        l1.abort(); l2.abort(); l3.abort();
+        QElapsedTimer w; w.start();
+        while (radio.listeners() != 0 && w.elapsed() < 3000) pump(50);
+        CHECK(radio.listeners() == 0, "al cerrar, los oyentes se descuentan");
+        CHECK(httpGet("/nada", 1000).startsWith("HTTP/1.0 404"), "ruta desconocida: 404");
+        jx::LocalRadio other;
+        jx::LocalRadio::Config busy = rc;
+        busy.port = radio.port();
+        CHECK(!other.start(busy, 48000, &err) && err.contains("puerto"), "puerto ocupado: «%s»", qPrintable(err));
+        feeding.store(false);
+        feeder.join();
+        radio.stop();
+        CHECK(!radio.running() && radio.port() == 0, "detener la radio");
+        CHECK(!jx::LocalRadio::lanAddresses().contains("127.0.0.1"), "las direcciones para el celular no incluyen localhost");
+
+        // Código QR
+        const auto qr = jx::QrItem::encode("http://192.168.1.50:8000/");
+        const size_t n = qr.size();
+        auto finder = [&](size_t ox, size_t oy) {   // patrón de posición: borde oscuro 7×7 y centro 3×3
+            for (size_t i = 0; i < 7; ++i)
+                if (!qr[oy][ox + i] || !qr[oy + 6][ox + i] || !qr[oy + i][ox] || !qr[oy + i][ox + 6]) return false;
+            return qr[oy + 3][ox + 3] && !qr[oy + 1][ox + 1];
+        };
+        CHECK(n >= 21 && (n - 17) % 4 == 0 && finder(0, 0) && finder(n - 7, 0) && finder(0, n - 7),
+              "código QR válido de %zu×%zu módulos con sus tres marcas de posición", n, n);
     }
 
     const QByteArray extra = qgetenv("JX_EXTRA_AUDIO");

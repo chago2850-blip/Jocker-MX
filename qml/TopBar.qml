@@ -23,6 +23,13 @@ Rectangle {
         Text { text: appVersion; color: Theme.faint; font.pixelSize: 11; Layout.alignment: Qt.AlignBottom; Layout.bottomMargin: 12 }
         Item { Layout.fillWidth: true }
 
+        Rectangle {     // Radio local
+            visible: radio.running
+            Layout.preferredHeight: 28; Layout.preferredWidth: rTxt.implicitWidth + 20
+            radius: 6
+            color: Qt.rgba(0.33, 0.88, 0.54, 0.15); border.color: Theme.green
+            Text { id: rTxt; anchors.centerIn: parent; text: "📻 RADIO · " + radio.listeners; color: Theme.green; font.pixelSize: 11; font.weight: Font.Black }
+        }
         Rectangle {     // Transmisión en vivo
             visible: broadcast.onAir
             Layout.preferredHeight: 28; Layout.preferredWidth: liveTxt.implicitWidth + 34

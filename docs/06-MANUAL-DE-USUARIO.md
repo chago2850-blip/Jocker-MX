@@ -1,4 +1,4 @@
-# 06 · Manual de usuario — Jocker-MX 0.14.0-dev
+# 06 · Manual de usuario — Jocker-MX 0.15.0-dev
 
 ## 1. Primer arranque
 1. Abre **Jocker-MX**. En la barra superior verás tu tarjeta de sonido, la frecuencia, la latencia y el número de canales de salida.
@@ -165,6 +165,17 @@ Necesitas un servidor **Icecast 2** o **SHOUTcast** (propio o contratado con un 
 - **Enviar el título**: manda «Artista - Título» de la pista que más se oye. En MP3 se actualiza en cuanto cambia; en Opus el título va al inicio de cada conexión.
 - Errores típicos: «Usuario o contraseña incorrectos», «El punto de montaje está en uso» (ya hay otra fuente conectada), «No se pudo conectar» (dirección o puerto equivocados, o un cortafuegos).
 - La configuración (incluida la contraseña) se guarda en este equipo. Desde la línea de comandos, `--broadcast` sale en vivo al abrir la app.
+
+## 5 sexies bis. Radio local (por la Wi-Fi, con código QR)
+Para que los asistentes escuchen la mezcla en su celular **sin internet ni servidor**: en una silent disco, en otro salón, en el estacionamiento o simplemente si están lejos de las bocinas.
+1. Abre la pestaña **📻 Radio** (en la interfaz táctil: **⋯ Más → 📻 Radio local**).
+2. Escribe el nombre de la radio y, si quieres, cambia la calidad (128 kbps va muy bien) o el puerto (8000).
+3. Pulsa **ENCENDER RADIO LOCAL**. Aparece un **código QR** con la dirección (p. ej. `http://192.168.1.50:8000/`).
+4. Quien esté **en la misma red Wi-Fi** lo escanea con la cámara del celular y toca **▶**. La página muestra lo que suena y cuántas personas escuchan.
+- Se transmite lo mismo que sale por el master. Cada persona tiene unos segundos de retraso respecto a las bocinas (normal en cualquier radio por internet).
+- También funciona en VLC, en una bocina inteligente o en otra computadora: abre la dirección y agrega `stream.mp3` (o `stream.ogg` para Opus).
+- Si los celulares no abren la página: comprueba que estén en la misma Wi-Fi (no en datos móviles) y que el cortafuegos de la computadora permita el puerto. Algunas redes de hoteles o «Wi-Fi de invitados» aíslan a los dispositivos entre sí; ahí no funciona.
+- Puedes tener la radio local y la transmisión a Icecast/SHOUTcast al mismo tiempo. Desde la línea de comandos, `--radio` la enciende al abrir.
 
 ## 5 septies. Interfaz táctil (teléfono, tableta y TV Box)
 En Android se abre directamente la **interfaz táctil**. En la computadora puedes probarla con el botón **📱 TÁCTIL** de la barra superior; para volver, **⋯ Más → 🖥 Escritorio**. La elección se recuerda.

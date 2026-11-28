@@ -36,7 +36,7 @@ BroadcastController::BroadcastController(AudioEngine* engine, DeckController* a,
 }
 
 BroadcastController::~BroadcastController() {
-    if (m_engine) m_engine->setTap(nullptr);
+    if (m_engine) m_engine->setTap(0, nullptr);
     m_bc.stop();
 }
 
@@ -94,7 +94,7 @@ bool BroadcastController::start() {
         emit statusChanged();
         return false;
     }
-    m_engine->setTap(&m_bc);
+    m_engine->setTap(0, &m_bc);
     m_lastBytes = 0;
     m_lastMs = QDateTime::currentMSecsSinceEpoch();
     m_kbps = 0;
@@ -106,7 +106,7 @@ bool BroadcastController::start() {
 }
 
 void BroadcastController::stop() {
-    m_engine->setTap(nullptr);
+    m_engine->setTap(0, nullptr);
     m_bc.stop();
     m_timer.stop();
     m_kbps = 0;
